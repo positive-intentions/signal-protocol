@@ -1,0 +1,9 @@
+[pack]
+name = "signal-protocol-wasm"
+out-dir = "pkg"
+
+[pack.profile.release]
+wasm-opt = ["-O4", "--enable-mutable-globals"]
+
+[pack.profile.dev]
+wasm-opt = false
