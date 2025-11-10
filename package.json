@@ -50,7 +50,7 @@
     "build:development": "webpack --mode development && cp -r dist/* ./Frontend",
     "build:coverage": "jest --coverage && cp -r coverage/lcov-report ./Frontend/coverage-report",
     "serve:storybook": "serve storybook-static",
-    "serve": "serve Frontend --cors",
+    "serve": "serve Frontend -p 8084 --cors",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "install-rust": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",

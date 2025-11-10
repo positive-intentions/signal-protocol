@@ -91,10 +91,10 @@ const moduleRedundency = ({
 const moduleFederationConfig = new ModuleFederationPlugin({
   name: "signal_protocol",
   filename: "remoteEntry.js",
-  exposes: {
-    './SignalProtocol': './src/stories/components/SignalProtocolDemo.tsx',
-    './WasmBindings': './src/wasm-bindings.js',
-  },
+  // exposes: {
+  //   './SignalProtocol': './src/stories/components/SignalProtocolDemo.tsx',
+  //   './WasmBindings': './src/wasm-bindings.js',
+  // },
   remotes: {
     "dim": moduleRedundency({
       moduleName: 'dim',
