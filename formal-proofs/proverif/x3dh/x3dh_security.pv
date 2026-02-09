@@ -22,7 +22,9 @@ free c: channel [private].
 
 fun compute_dh(skey, pkey): bitstring.
 fun concat(bitstring, bitstring): bitstring.
-fun hkdf(bitstring): bitstring.
+fun hkdf_salt_x3dh(): bitstring.
+fun hkdf_info_x3dh(): bitstring.
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
 
 event alice_initiates.
 event bob_responds.
@@ -40,7 +42,7 @@ let processA =
   new opk_a: pkey;
   event alice_initiates;
   let dh1 = compute_dh(ik_b, spk_a) in
-  let root = hkdf(dh1) in
+  let root = hkdf(hkdf_salt_x3dh(), dh1, hkdf_info_x3dh()) in
   out(c, root).
 
 let processB =

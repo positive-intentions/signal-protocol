@@ -99,6 +99,7 @@ The ProVerif models use the exact same constants and operations as the Rust impl
 
 - **X3DH DH operations**: Match `src/rust/x3dh.rs` lines 43-56
 - **HKDF constants**: All salts and info strings in `HKDF_CONSTANTS.md`
+- **HKDF function signature**: All ProVerif models use `hkdf(salt, ikm, info)` to match Rust's `Hkdf::new(salt, ikm).expand(info, output)` pattern
 - **AAD format**: Matches the `DH_public_key || message_number || previous_chain_length` format in `double_ratchet.rs`
 
 ## Test Results
@@ -110,7 +111,12 @@ Failed: 0 models
 Success: 100%
 ```
 
-All models compile and verify successfully.
+All models compile and verify successfully. Run tests with:
+
+```bash
+cd formal-proofs
+./test_proverif.sh
+```
 
 ## Comparison: ProVerif vs. CryptoVerif
 

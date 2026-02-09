@@ -35,7 +35,7 @@ fun hkdf_salt_dh_ratchet(): bitstring.
 fun hkdf_info_chain_key(): bitstring.
 fun hkdf_info_message_key(): bitstring.
 fun byte_one_val(bitstring): bitstring.
-fun hkdf(bitstring, bitstring): bitstring.
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
 
 event alice_initiates_x3dh.
 event bob_completes_x3dh.
@@ -71,13 +71,9 @@ query x: bitstring; inj-event(x3dh_root_derived(x)) ==> inj-event(dr_state_initi
 
 query x: bitstring; inj-event(message_sent(x)) ==> inj-event(message_received(x)).
 
-query x: bitstring; inj-event(message_received(x)).
-
 query x: bitstring; inj-event(dh_ratchet_occurred(x)) ==> inj-event(receiving_chain_key_derived(x)).
 
 query x: bitstring; inj-event(receiving_chain_key_derived(x)) ==> inj-event(message_key_derived(x)).
-
-query x: bitstring; inj-event(message_key_derived(x)).
 
 let process_alice_x3dh =
   event alice_initiates_x3dh;
@@ -90,9 +86,9 @@ let process_alice_x3dh =
   let dh4 = dh(ik_a_priv, opk_b_pub) in
   event dh4_computed(dh4);
   let x3dh_dh_combined = concat(dh1, concat(dh2, concat(dh3, dh4))) in
-  let salt = hkdf_salt_x3dh() in
-  let info = hkdf_info_x3dh() in
-  let x3dh_root = hkdf(x3dh_dh_combined, info) in
+  let salt_x3dh = hkdf_salt_x3dh() in
+  let info_x3dh = hkdf_info_x3dh() in
+  let x3dh_root = hkdf(salt_x3dh, x3dh_dh_combined, info_x3dh) in
   event x3dh_root_derived(x3dh_root);
   out(c, x3dh_root).
 
@@ -108,10 +104,9 @@ let process_dr_ratchet =
   let new_dh_priv = dh_pair_priv_key in
   let new_dh_pub = other_dh_pub_key in
   let dh_output = dh(new_dh_priv, new_dh_pub) in
-  let combined = concat(dh_output, x3dh_root) in
-  let salt = hkdf_salt_dh_ratchet() in
-  let info = hkdf_info_chain_key() in
-  let new_root = hkdf(combined, info) in
+  let salt_dh_ratchet = hkdf_salt_dh_ratchet() in
+  let info_chain_key = hkdf_info_chain_key() in
+  let new_root = hkdf(salt_dh_ratchet, dh_output, info_chain_key) in
   event dh_ratchet_occurred(new_root);
   let byte_one_val = byte_one_val(new_root) in
   let recv_chain = concat(new_root, byte_one_val) in

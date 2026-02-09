@@ -20,7 +20,9 @@ free c: channel [private].
 
 fun compute_dh(skey, pkey): bitstring.
 fun concat(bitstring, bitstring): bitstring.
-fun hkdf(bitstring): bitstring.
+fun hkdf_salt_x3dh(): bitstring.
+fun hkdf_info_x3dh(): bitstring.
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
 
 event alice_initiates.
 event bob_responds.
@@ -56,7 +58,7 @@ let processA =
   (* DH4 = DH(Ephemeral_Alice, OneTimePreKey_Bob) *)
   let dh4 = compute_dh(ephemeral_a, one_time_prekey_b_pub) in
   let combined = concat(dh1, concat(dh2, concat(dh3, dh4))) in
-  let root = hkdf(combined) in
+  let root = hkdf(hkdf_salt_x3dh(), combined, hkdf_info_x3dh()) in
   event root_derived(root);
   event x3dh_secret(root);
   out(c, root).

@@ -19,9 +19,10 @@ free c: channel [private].
 
 fun dh(skey, bitstring): bitstring.
 fun concat(bitstring, bitstring): bitstring.
-fun hkdf(bitstring, bitstring): bitstring.
-fun hkdf_root_key(): bitstring.
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
+fun hkdf_salt_dh_ratchet(): bitstring.
 fun hkdf_info_chain_key(): bitstring.
+fun hkdf_info_message_key(): bitstring.
 fun xor(bitstring, bitstring): bitstring.
 
 event old_compromise(bitstring).
@@ -69,14 +70,14 @@ query x: bitstring; inj-event(new_message(x)).
 let process_forward_secrecy =
   event old_compromise(root_key_old);
   let dh_out = dh(ik_a, ik_b_pub) in
-  let root_new = hkdf(dh_out, hkdf_root_key()) in
+  let root_new = hkdf(hkdf_salt_dh_ratchet(), dh_out, hkdf_info_chain_key()) in
   event new_key_not_reachable_from_old(root_new).
 
 let process_post_compromise =
   event compromise_root_key(root_key_old);
   let dh_out = dh(ik_a, ik_b_pub) in
-  let root_new = hkdf(dh_out, hkdf_root_key()) in
-  let chain_new = hkdf(root_new, hkdf_info_chain_key()) in
+  let root_new = hkdf(hkdf_salt_dh_ratchet(), dh_out, hkdf_info_chain_key()) in
+  let chain_new = hkdf(hkdf_info_chain_key(), root_new, hkdf_info_chain_key()) in
   event new_message(chain_new);
   out(c, chain_new).
 

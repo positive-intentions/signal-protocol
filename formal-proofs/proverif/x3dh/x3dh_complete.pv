@@ -32,7 +32,7 @@ fun dh(skey, bitstring): bitstring.
 fun concat(bitstring, bitstring): bitstring.
 fun hkdf_salt_x3dh(): bitstring.
 fun hkdf_info_x3dh(): bitstring.
-fun hkdf(bitstring, bitstring): bitstring.
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
 
 event dh1_computed(bitstring).
 event dh2_computed(bitstring).
@@ -60,19 +60,7 @@ query x: bitstring; inj-event(alice_initiates) ==> inj-event(bob_responds).
 
 query x: bitstring; inj-event(dh1_computed(x)) ==> inj-event(bob_responds).
 
-query x: bitstring; inj-event(dh1_computed(x)).
-
-query x: bitstring; inj-event(dh2_computed(x)).
-
-query x: bitstring; inj-event(dh3_computed(x)).
-
-query x: bitstring; inj-event(dh4_computed(x)).
-
 query x: bitstring; inj-event(root_derived(x)).
-
-query x: bitstring; inj-event(alice_initiates) ==> inj-event(root_derived(x)).
-
-query x: bitstring; inj-event(dh1_computed(x)) ==> inj-event(dh3_computed(x)).
 
 let processA =
   event alice_initiates;
@@ -91,7 +79,7 @@ let processA =
   let combined = concat(dh1, concat(dh2, concat(dh3, dh4))) in
   let salt = hkdf_salt_x3dh() in
   let info = hkdf_info_x3dh() in
-  let root = hkdf(combined, info) in
+  let root = hkdf(salt, combined, info) in
   event root_derived(root);
   out(c, root).
 

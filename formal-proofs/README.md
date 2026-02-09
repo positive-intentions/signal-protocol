@@ -19,7 +19,7 @@ export PATH="$HOME/.opam/default/bin:$PATH"
 
 Verifies the initial key exchange between Alice and Bob:
 
-- All 4 Diffie-Hellman operations execute in the correct order
+- Up to 4 Diffie-Hellman operations execute in the correct order (DH4 is optional for additional forward secrecy)
 - The shared secret can only be derived by parties with the correct private keys
 - HKDF key derivation produces consistent outputs for both parties
 
@@ -77,3 +77,4 @@ The ProVerif models reference the Rust implementation:
 - `src/rust/double_ratchet.rs`: Double Ratchet HKDF constants and AAD format
 
 All DH operations, HKDF salts, info strings, and AAD formats match exactly what's in the code.
+The ProVerif `hkdf(salt, ikm, info)` function signature models Rust's `Hkdf::new(salt, ikm).expand(info, output)` pattern.

@@ -25,7 +25,7 @@ fun concat3(bitstring, bitstring, bitstring): bitstring.
 fun hkdf_salt_dh_ratchet(): bitstring.
 fun hkdf_info_chain_key(): bitstring.
 fun byte_one_val(bitstring): bitstring.
-fun hkdf(bitstring, bitstring): bitstring.
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
 
 event dh_ratchet_init(bitstring).
 event root_key_derived(bitstring).
@@ -64,7 +64,7 @@ let processA =
   let combined = concat(dh_output, root_key) in
   let salt = hkdf_salt_dh_ratchet() in
   let info = hkdf_info_chain_key() in
-  let new_root = hkdf(combined, info) in
+  let new_root = hkdf(salt, combined, info) in
   event root_key_derived(new_root);
   let old_chain = chain_key in
   event old_chain_secure(old_chain);

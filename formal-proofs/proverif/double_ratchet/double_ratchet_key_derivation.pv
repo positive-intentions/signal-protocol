@@ -26,8 +26,7 @@ fun concat3(bitstring, bitstring, bitstring): bitstring.
 fun hkdf_salt_dh_ratchet(): bitstring.
 fun hkdf_info_chain_key(): bitstring.
 fun hkdf_info_message_key(): bitstring.
-fun hkdf_signal_chain_salt(): bitstring.
-fun hkdf(bitstring, bitstring): bitstring.
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
 fun aad_format(bitstring, bitstring, bitstring): bitstring.
 
 event dh_computed(bitstring).
@@ -72,13 +71,12 @@ let processA =
   let dh_out = dh(ik_a, dh_public_key) in
   event dh_computed(dh_out);
   let salt_dh_ratchet = hkdf_salt_dh_ratchet() in
-  let root_new = hkdf(dh_output, salt_dh_ratchet) in
+  let root_new = hkdf(salt_dh_ratchet, dh_out, hkdf_info_chain_key()) in
   event root_key_derived(root_new);
-  let info_chain = hkdf_info_chain_key() in
-  let chain_new = hkdf(root_new, info_chain) in
+  let chain_new = hkdf(hkdf_info_chain_key(), root_new, hkdf_info_chain_key()) in
   event chain_key_derived(chain_new);
   let info_msg = hkdf_info_message_key() in
-  let msg_key = hkdf(chain_new, info_msg) in
+  let msg_key = hkdf(info_msg, chain_new, info_msg) in
   event message_key_derived(msg_key);
   let aad = aad_format(dh_public_key, message_number, previous_chain_length) in
   event aad_generated(aad);
