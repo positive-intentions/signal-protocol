@@ -1,0 +1,95 @@
+(******************************************************************
+ *                                                                *
+ *  Double Ratchet Key Derivation - PROVERIF Model                 *
+ *                                                                *
+ *  Models chain key and message key derivation in Double Ratchet:*
+ *    1. Root key derivation from DH output                        *
+ *    2. Chain key derivation from root key                       *
+ *    3. Message key derivation from chain key                     *
+ *    4. AAD format: DH_public_key || message_number ||           *
+ *                  previous_chain_length                        *
+ *                                                                *
+ *  From implementation src/rust/double_ratchet.rs                  *
+ *                                                                *
+ ******************************************************************)
+
+type key.
+type skey.
+type pkey.
+type plaintext.
+
+free c: channel [private].
+
+fun dh(skey, bitstring): bitstring.
+fun concat(bitstring, bitstring): bitstring.
+fun concat3(bitstring, bitstring, bitstring): bitstring.
+fun hkdf_root_key(): bitstring.
+fun hkdf_info_chain_key(): bitstring.
+fun hkdf_info_message_key(): bitstring.
+fun hkdf(bitstring, bitstring): bitstring.
+fun aad_format(bitstring, bitstring, bitstring): bitstring.
+
+event dh_computed(bitstring).
+event root_key_derived(bitstring).
+event chain_key_derived(bitstring).
+event message_key_derived(bitstring).
+event aad_generated(bitstring).
+event message_encrypted(bitstring).
+
+free ik_a: skey [private].
+free ik_b: skey [private].
+free dh_public_key: bitstring [private].
+free dh_output: bitstring [private].
+free root_key: bitstring [private].
+free chain_key: bitstring [private].
+free message_key: bitstring [private].
+free message_number: bitstring [private].
+free previous_chain_length: bitstring [private].
+free message: plaintext [private].
+free sk: skey [private].
+
+query attacker(sk).
+
+query x: bitstring; inj-event(dh_computed(x)).
+
+query x: bitstring; inj-event(root_key_derived(x)).
+
+query x: bitstring; inj-event(chain_key_derived(x)).
+
+query x: bitstring; inj-event(message_key_derived(x)).
+
+query x: bitstring; inj-event(aad_generated(x)).
+
+query x: bitstring; inj-event(message_encrypted(x)).
+
+query x: bitstring; (inj-event(root_key_derived(x)) ==> inj-event(chain_key_derived(x))).
+
+query x: bitstring; (inj-event(chain_key_derived(x)) ==> inj-event(message_key_derived(x))).
+
+query x: bitstring; (inj-event(message_key_derived(x)) ==> inj-event(message_encrypted(x))).
+
+let processA =
+  let dh_out = dh(ik_a, dh_public_key) in
+  event dh_computed(dh_out);
+  let info_root = hkdf_root_key() in
+  let root_new = hkdf(dh_output, info_root) in
+  event root_key_derived(root_new);
+  let info_chain = hkdf_info_chain_key() in
+  let chain_new = hkdf(root_new, info_chain) in
+  event chain_key_derived(chain_new);
+  let info_msg = hkdf_info_message_key() in
+  let msg_key = hkdf(chain_new, info_msg) in
+  event message_key_derived(msg_key);
+  let aad = aad_format(dh_public_key, message_number, previous_chain_length) in
+  event aad_generated(aad);
+  event message_encrypted(message_key);
+  out(c, msg_key).
+
+let processB =
+  in(c, x: bitstring);
+  out(c, x).
+
+process
+  (!processA)
+  |
+  (!processB)

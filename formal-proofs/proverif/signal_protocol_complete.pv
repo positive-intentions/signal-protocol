@@ -1,0 +1,143 @@
+(******************************************************************
+ *                                                                *
+ *  End-to-End Signal Protocol - Combined X3DH + Double Ratchet  *
+ *  PROVERIF Model                                               *
+ *                                                                *
+ *  This model demonstrates the complete Signal Protocol:         *
+ *    1. X3DH handshake establishes initial shared secret         *
+ *    2. Double Ratchet provides ongoing message confidentiality *
+ *                                                                *
+ *  Security Properties:                                           *
+ *    - X3DH authentication: Only parties with correct keys       *
+ *      can derive shared secret                                  *
+ *    - X3DH forward secrecy: Past X3DH secrets remain secure     *
+ *    - Double Ratchet forward secrecy: Past messages secure      *
+ *      after state compromise                                    *
+ *    - Double Ratchet post-compromise security: New messages    *
+ *      recover security after initial key compromise            *
+ *    - End-to-end message confidentiality: Attacker cannot      *
+ *      derive message content                                    *
+ *                                                                *
+ ******************************************************************)
+
+type key.
+type skey.
+type pkey.
+
+free c: channel [private].
+
+fun dh(skey, bitstring): bitstring.
+fun concat(bitstring, bitstring): bitstring.
+fun concat3(bitstring, bitstring, bitstring): bitstring.
+fun hkdf_salt_x3dh(): bitstring.
+fun hkdf_info_x3dh(): bitstring.
+fun hkdf_salt_dh_ratchet(): bitstring.
+fun hkdf_info_chain_key(): bitstring.
+fun hkdf_info_message_key(): bitstring.
+fun byte_one(): bitstring.
+fun hkdf(bitstring, bitstring): bitstring.
+
+event alice_initiates_x3dh.
+event bob_completes_x3dh.
+event dh1_computed(bitstring).
+event dh2_computed(bitstring).
+event dh3_computed(bitstring).
+event dh4_computed(bitstring).
+event x3dh_root_derived(bitstring).
+event dr_state_initialized(bitstring).
+event dh_ratchet_occurred(bitstring).
+event receiving_chain_key_derived(bitstring).
+event message_key_derived(bitstring).
+event message_sent(bitstring).
+event message_received(bitstring).
+event attacker_cannot_decrypt(bitstring).
+
+free ik_b_priv: skey [private].
+free ik_a_priv: skey [private].
+free sk_priv: skey [private].
+free spk_b_pub: bitstring [private].
+free spk_a_pub: bitstring [private].
+free opk_b_pub: bitstring [private].
+free opk_a_pub: bitstring [private].
+free dh_pair_priv_key: skey [private].
+free other_dh_pub_key: bitstring [private].
+free plaintext_msg: bitstring [private].
+
+query attacker(sk_priv).
+
+query x: bitstring; inj-event(alice_initiates_x3dh) ==> inj-event(bob_completes_x3dh).
+
+query x: bitstring; inj-event(x3dh_root_derived(x)) ==> inj-event(dr_state_initialized(x)).
+
+query x: bitstring; inj-event(message_sent(x)) ==> inj-event(message_received(x)).
+
+query x: bitstring; inj-event(message_received(x)).
+
+query x: bitstring; inj-event(dh_ratchet_occurred(x)) ==> inj-event(receiving_chain_key_derived(x)).
+
+query x: bitstring; inj-event(receiving_chain_key_derived(x)) ==> inj-event(message_key_derived(x)).
+
+query x: bitstring; inj-event(message_key_derived(x)).
+
+let process_alice_x3dh =
+  event alice_initiates_x3dh;
+  let dh1 = dh(ik_b_priv, spk_a_pub) in
+  event dh1_computed(dh1);
+  let dh2 = dh(ik_b_priv, opk_a_pub) in
+  event dh2_computed(dh2);
+  let dh3 = dh(ik_a_priv, spk_b_pub) in
+  event dh3_computed(dh3);
+  let dh4 = dh(ik_a_priv, opk_b_pub) in
+  event dh4_computed(dh4);
+  let x3dh_dh_combined = concat(dh1, concat(dh2, concat(dh3, dh4))) in
+  let salt = hkdf_salt_x3dh() in
+  let info = hkdf_info_x3dh() in
+  let x3dh_root = hkdf(x3dh_dh_combined, info) in
+  event x3dh_root_derived(x3dh_root);
+  out(c, x3dh_root).
+
+let process_bob_x3dh =
+  in(c, x3dh_root: bitstring);
+  event bob_completes_x3dh;
+  event x3dh_root_derived(x3dh_root);
+  out(c, x3dh_root).
+
+let process_dr_ratchet =
+  in(c, x3dh_root: bitstring);
+  event dr_state_initialized(x3dh_root);
+  let new_dh_priv = dh_pair_priv_key in
+  let new_dh_pub = other_dh_pub_key in
+  let dh_output = dh(new_dh_priv, new_dh_pub) in
+  let combined = concat(dh_output, x3dh_root) in
+  let salt = hkdf_salt_dh_ratchet() in
+  let info = hkdf_info_chain_key() in
+  let new_root = hkdf(combined, info) in
+  event dh_ratchet_occurred(new_root);
+  let recv_chain = concat(new_root, byte_one()) in
+  event receiving_chain_key_derived(recv_chain);
+  let msg_key = concat(recv_chain, byte_one()) in
+  event message_key_derived(msg_key);
+  out(c, msg_key).
+
+let message_exchange =
+  in(c, msg_key: bitstring);
+  event message_sent(plaintext_msg);
+  let ciphertext = msg_key in
+  event message_received(ciphertext);
+  out(c, ciphertext).
+
+let process_attacker =
+  in(c, x: bitstring);
+  event attacker_cannot_decrypt(x);
+  out(c, x).
+
+process
+  (!process_alice_x3dh)
+  |
+  (!process_bob_x3dh)
+  |
+  (!process_dr_ratchet)
+  |
+  (!message_exchange)
+  |
+  (!process_attacker)

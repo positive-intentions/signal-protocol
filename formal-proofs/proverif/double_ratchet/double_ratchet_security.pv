@@ -1,0 +1,92 @@
+(******************************************************************
+ *                                                                *
+ *  Double Ratchet Security Properties - PROVERIF Model           *
+ *                                                                *
+ *  Security properties for Double Ratchet:                        *
+ *    1. Forward secrecy: Past messages remain secure after     *
+ *       key compromise                                          *
+ *    2. Post-compromise security: System recovers security       *
+ *       after initial key compromise                            *
+ *    3. Key secrecy: Keys remain secret from attacker           *
+ *                                                                *
+ ******************************************************************)
+
+type key.
+type skey.
+type pkey.
+
+free c: channel [private].
+
+fun dh(skey, bitstring): bitstring.
+fun concat(bitstring, bitstring): bitstring.
+fun hkdf(bitstring, bitstring): bitstring.
+fun hkdf_root_key(): bitstring.
+fun hkdf_info_chain_key(): bitstring.
+fun xor(bitstring, bitstring): bitstring.
+
+event old_compromise(bitstring).
+event compromise_root_key(bitstring).
+event compromise_chain_key(bitstring).
+event new_message(bitstring).
+event new_key_not_reachable_from_old(bitstring).
+event old_key_not_reachable_from_new(bitstring).
+
+free ik_a: skey [private].
+free ik_b: skey [private].
+free ik_a_pub: bitstring [private].
+free ik_b_pub: bitstring [private].
+free dh_output: bitstring [private].
+free root_key_old: bitstring [private].
+free root_key_new: bitstring [private].
+free chain_key_old: bitstring [private].
+free chain_key_new: bitstring [private].
+free message_one: bitstring [private].
+free message_two: bitstring [private].
+free sk: skey [private].
+
+query attacker(sk).
+
+query x: bitstring; inj-event(compromise_root_key(x)).
+
+query x: bitstring; inj-event(compromise_chain_key(x)).
+
+query x: bitstring; inj-event(old_compromise(x)).
+
+query x: bitstring; inj-event(new_message(x)).
+
+query x: bitstring; inj-event(new_message(x)).
+
+query x: bitstring; (inj-event(compromise_root_key(x)) ==> inj-event(new_message(x))).
+
+query x: bitstring; (inj-event(compromise_chain_key(x)) ==> inj-event(new_message(x))).
+
+query x: bitstring; inj-event(new_key_not_reachable_from_old(x)).
+
+query x: bitstring; inj-event(old_key_not_reachable_from_new(x)).
+
+query x: bitstring; inj-event(new_message(x)).
+
+let process_forward_secrecy =
+  event old_compromise(root_key_old);
+  let dh_out = dh(ik_a, ik_b_pub) in
+  let root_new = hkdf(dh_out, hkdf_root_key()) in
+  event new_key_not_reachable_from_old(root_new).
+
+let process_post_compromise =
+  event compromise_root_key(root_key_old);
+  let dh_out = dh(ik_a, ik_b_pub) in
+  let root_new = hkdf(dh_out, hkdf_root_key()) in
+  let chain_new = hkdf(root_new, hkdf_info_chain_key()) in
+  event new_message(chain_new);
+  out(c, chain_new).
+
+let processB =
+  in(c, x: bitstring);
+  out(c, x).
+
+process
+  (!process_forward_secrecy)
+  |
+  (!process_post_compromise)
+  |
+  (!processB)

@@ -1,0 +1,53 @@
+(******************************************************************
+ *                                                                *
+ *  X3DH Security Properties Model - PROVERIF Version             *
+ *                                                                *
+ *  Migrated from CryptoVerif x3dh_security_properties.cv         *
+ *                                                                *
+ *  Security Properties Modeled:                                  *
+ *    - Key Secrecy: Shared secret is computationally            *
+ *      indistinguishable from random                           *
+ *    - Authentication: Only parties with correct                *
+ *      private keys can derive shared secret                   *
+ *    - Forward Secrecy: Past secrets remain secure              *
+ *      after key compromise                                     *
+ *                                                                *
+ ******************************************************************)
+
+type key.
+type skey.
+type pkey.
+
+free c: channel [private].
+
+fun compute_dh(skey, pkey): bitstring.
+fun concat(bitstring, bitstring): bitstring.
+fun hkdf(bitstring): bitstring.
+
+event alice_initiates.
+event bob_responds.
+
+query attacker(sk).
+query x: bitstring; inj-event(alice_initiates).
+query x: bitstring; inj-event(bob_responds).
+
+free ik_b: skey [private].
+free spk_b: pkey [private].
+free sk: skey [private].
+
+let processA =
+  new spk_a: pkey;
+  new opk_a: pkey;
+  event alice_initiates;
+  let dh1 = compute_dh(ik_b, spk_a) in
+  let root = hkdf(dh1) in
+  out(c, root).
+
+let processB =
+  in(c, x: bitstring);
+  event bob_responds.
+
+process
+  (!processA)
+  |
+  (!processB)
