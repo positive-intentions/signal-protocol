@@ -24,7 +24,7 @@ fun concat(bitstring, bitstring): bitstring.
 fun concat3(bitstring, bitstring, bitstring): bitstring.
 fun hkdf_salt_dh_ratchet(): bitstring.
 fun hkdf_info_chain_key(): bitstring.
-fun byte_one(): bitstring.
+fun byte_one_val(bitstring): bitstring.
 fun hkdf(bitstring, bitstring): bitstring.
 
 event dh_ratchet_init(bitstring).
@@ -68,9 +68,10 @@ let processA =
   event root_key_derived(new_root);
   let old_chain = chain_key in
   event old_chain_secure(old_chain);
-  let new_chain = concat(new_root, byte_one()) in
+  let byte_one_val = byte_one_val(new_root) in
+  let new_chain = concat(new_root, byte_one_val) in
   event receiving_chain_key_derived(new_chain);
-  let msg_key = concat(new_chain, byte_one()) in
+  let msg_key = concat(new_chain, byte_one_val) in
   event message_key_derived(msg_key);
   event state_updated;
   out(c, msg_key).

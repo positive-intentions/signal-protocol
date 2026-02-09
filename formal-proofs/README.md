@@ -1,89 +1,79 @@
 # Signal Protocol Formal Verification
 
-## Overview
-
-This directory contains formal verification models of the Signal Protocol using PROVERIF.
+This directory contains formal verification models of the Signal Protocol using PROVERIF. These models help verify that the implementation correctly handles key exchanges and protects against common cryptographic attacks.
 
 ## Quick Start
-
-### Installation
 
 ```bash
 # Install PROVERIF
 opam install proverif
 export PATH="$HOME/.opam/default/bin:$PATH"
-```
 
-### Running the Proofs
-
-```bash
-# Test all models (fast check)
-./test_proverif_quick.sh
-
-# Detailed analysis with security properties
+# Run all proofs
 ./test_proverif.sh
-
-# Test specific model
-proverif proverif/x3dh/x3dh_complete.pv
 ```
+
+## What's Verified
+
+### X3DH Handshake (`x3dh/*.pv`)
+
+Verifies the initial key exchange between Alice and Bob:
+
+- All 4 Diffie-Hellman operations execute in the correct order
+- The shared secret can only be derived by parties with the correct private keys
+- HKDF key derivation produces consistent outputs for both parties
+
+### Double Ratchet (`double_ratchet/*.pv`)
+
+Verifies ongoing message security:
+
+- Forward secrecy: If a key is compromised, past messages remain secure
+- Post-compromise security: After a compromise, new messages become secure again
+- Message authentication: Only messages encrypted by the sender can be decrypted by the intended recipient
+
+### End-to-End (`signal_protocol_complete.pv`)
+
+Combines X3DH and Double Ratchet in a single model. Note: This model doesn't link the X3DH handshake to the Double Ratchet phase with a channel, so it doesn't prove the full end-to-end correspondence.
 
 ## Models
 
-```
-formal-proofs/proverif/
-├── x3dh/
-│   ├── x3dh_4dh.pv              # All 4 X3DH DH operations
-│   ├── x3dh_complete.pv        # Complete X3DH with HKDF constants
-│   └── x3dh_security.pv        # X3DH security properties
-├── double_ratchet/
-│   ├── double_ratchet_dr.pv    # State transitions
-│   ├── double_ratchet_key_derivation.pv  # Key derivation chain
-│   └── double_ratchet_security.pv       # FS and PCS proofs
-└── signal_protocol_complete.pv          # End-to-end X3DH + DR
-```
+| File                                              | Purpose                                                     |
+| ------------------------------------------------- | ----------------------------------------------------------- |
+| `x3dh/x3dh_4dh.pv`                                | Demonstrates all 4 X3DH DH operations                       |
+| `x3dh/x3dh_complete.pv`                           | Full X3DH handshake with HKDF constants from implementation |
+| `x3dh/x3dh_security.pv`                           | Basic X3DH security properties                              |
+| `double_ratchet/double_ratchet_dr.pv`             | DH ratchet state transitions                                |
+| `double_ratchet/double_ratchet_key_derivation.pv` | Chain and message key derivation                            |
+| `double_ratchet/double_ratchet_security.pv`       | Forward and post-compromise security                        |
+| `signal_protocol_complete.pv`                     | Combined X3DH + Double Ratchet                              |
 
-## Security Properties Proven
+## Running Individual Models
 
-| Property                  | Status    | Notes                                  |
-| ------------------------- | --------- | -------------------------------------- |
-| Key Secrecy               | ✅ PROVED | Private keys inaccessible to attacker  |
-| X3DH: All 4 DH Operations | ✅ PROVED | Modeled correctly (DH1-DH4)            |
-| X3DH: HKDF Key Derivation | ✅ PROVED | With implementation constants          |
-| Forward Secrecy           | ✅ PROVED | Old keys secure after state updates    |
-| Post-Compromise Security  | ✅ PROVED | System recovers after compromise       |
-| Message Authentication    | ✅ PROVED | Encryption ⇒ decryption correspondence |
-
-## Proof Results
-
-All 7 PROVERIF models compile and prove security properties:
-
-```
-Total: 7 models
-Passed: 7 models
-Failed: 0 models
-Success Rate: 100%
+```bash
+proverif proverif/x3dh/x3dh_complete.pv
+proverif proverif/double_ratchet/double_ratchet_security.pv
 ```
 
-Full breakdown: See [docs/PROOF_RESULTS.md](docs/PROOF_RESULTS.md)
+## Interpreting Results
+
+ProVerif outputs show security queries and their results:
+
+- **`RESULT not attacker(sk[]) is true`**: Secret keys are not accessible to the attacker
+- **`RESULT not event(...) is false`**: The event fires (expected for normal protocol operations)
+- **`RESULT inj-event(...) ==> inj-event(...) is true`**: Cryptographic correspondence (authentication)
 
 ## Documentation
 
-| Document                                              | Purpose                              |
-| ----------------------------------------------------- | ------------------------------------ |
-| [FORMAL_PROOF_STATUS.md](docs/FORMAL_PROOF_STATUS.md) | Proof results and model status       |
-| [VERIFICATION_GUIDE.md](docs/VERIFICATION_GUIDE.md)   | How to run and interpret proofs      |
-| [INSTALLATION.md](docs/INSTALLATION.md)               | PROVERIF installation instructions   |
-| [HKDF_CONSTANTS.md](docs/HKDF_CONSTANTS.md)           | Implementation constants from source |
+- **[FORMAL_PROOF_STATUS.md](docs/FORMAL_PROOF_STATUS.md)**: Detailed results and model status
+- **[VERIFICATION_GUIDE.md](docs/VERIFICATION_GUIDE.md)**: How to run and interpret proofs
+- **[HKDF_CONSTANTS.md](docs/HKDF_CONSTANTS.md)**: HKDF constants from the implementation
+- **[INSTALLATION.md](docs/INSTALLATION.md)**: PROVERIF setup instructions
 
-## Implementation References
+## Implementation Alignment
 
-Proofs reference implementation at:
+The ProVerif models reference the Rust implementation:
 
-- `src/rust/x3dh.rs` (DH operations, HKDF constants)
-- `src/rust/double_ratchet.rs` (HKDF constants, AAD format)
+- `src/rust/x3dh.rs`: X3DH DH operations and HKDF constants
+- `src/rust/double_ratchet.rs`: Double Ratchet HKDF constants and AAD format
 
-## Why PROVERIF?
-
-## License
-
-Part of Signal Protocol implementation. See project root for license information.
+All DH operations, HKDF salts, info strings, and AAD formats match exactly what's in the code.

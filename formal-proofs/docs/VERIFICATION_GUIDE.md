@@ -1,86 +1,99 @@
-# Verification Guide: Running and Interpreting PROVERIF Proofs
+# Verification Guide: Running PROVERIF Proofs
 
-## Overview
+This guide shows how to run the formal proofs and understand what they tell you.
 
-This guide explains how to run the PROVERIF proofs for the Signal Protocol implementation and interpret the results.
-
-## Prerequisites
-
-Before running proofs, ensure you have:
-
-1. **PROVERIF installed** (see `INSTALLATION.md`)
-2. **OPAM environment** set up correctly
-3. **Test scripts** from the project root
-
-## Running Proofs
-
-### Quick Test Scripts
+## Quick Start
 
 ```bash
-cd /home/raju/repos/positive-intentions/signal-protocol
-./test_proverif_quick.sh          # Fast pass/fail check (5 seconds)
-./test_proverif.sh               # Detailed security analysis
-```
+# Run all proofs
+./test_proverif.sh
 
-### Running Individual Models
-
-```bash
+# Run individual proof
 proverif proverif/x3dh/x3dh_complete.pv
-proverif proverif/double_ratchet/double_ratchet_security.pv
 ```
 
-## Interpreting Results
+## Understanding ProVerif Output
 
-### Successful Proof
+### Security Queries
 
-A successful proof shows the model compiles and security properties are verified:
+ProVerif proves security properties through queries. Here's what each means:
+
+**Key Secrecy** (most important):
 
 ```
-RESULT not attacker(sk[]) is true.      # Key secrecy proved
+RESULT not attacker(sk[]) is true.
 ```
+
+This means the attacker cannot derive the secret key. The implementation keeps secrets secret.
+
+**Event Queries**:
+
+```
+RESULT not event(dh1_computed(x)) is false.
+```
+
+When this is `false`, it means the event actually fires during protocol execution. This is expected for normal operations like computing DH values.
+
+**Correspondence Queries**:
+
+```
+RESULT inj-event(encrypt(x)) ==> inj-event(decrypt(x)) is true.
+```
+
+This proves that a message can only be decrypted if it was encrypted by the sender with the key.
+
+### What to Look For
+
+- **Compiles Successfully**: The model syntax is correct
+- **`not attacker(sk[]) is true`**: Private keys stay private
+- **`inj-event(...)` queries**: Authentication checks (events happen in the right order)
 
 ### Expected "False" Results
 
-Some queries return `false` by design - this means the event executes:
+Some queries return `false` but that's okay:
 
+- Events that are supposed to fire (like `dh1_computed`)
+- Correspondence queries when processes aren't linked via channels
+
+## Running Individual Models
+
+### X3DH Models
+
+```bash
+proverif proverif/x3dh/x3dh_complete.pv      # Full X3DH handshake
+proverif proverif/x3dh/x3dh_security.pv      # Security properties only
+proverif proverif/x3dh/x3dh_4dh.pv            # DH operations demo
 ```
-RESULT not event(dh1_computed(x_1)) is false.  # Event executes (expected)
+
+### Double Ratchet Models
+
+```bash
+proverif proverif/double_ratchet/double_ratchet_dr.pv
+proverif proverif/double_ratchet/double_ratchet_security.pv
+proverif proverif/double_ratchet/double_ratchet_key_derivation.pv
 ```
 
-### Proof Status Examples
+### End-to-End
 
-| Property                  | Expected Result | Meaning                        |
-| ------------------------- | --------------- | ------------------------------ |
-| Key secrecy               | ✅ `true`       | Private keys aren't accessible |
-| Events firing             | ❌ `false`      | Event executes (expected)      |
-| Correspondence (unlinked) | ❌ `false`      | No channel linking (expected)  |
+```bash
+proverif proverif/signal_protocol_complete.pv
+```
 
-## Security Properties Verified
+## What Gets Proven
 
-All 7 PROVERIF models prove:
-
-| Property                 | Status    |
-| ------------------------ | --------- |
-| All 4 X3DH DH operations | ✅ PROVED |
-| Key secrecy              | ✅ PROVED |
-| Forward secrecy          | ✅ PROVED |
-| Post-compromise security | ✅ PROVED |
-| Message authentication   | ✅ PROVED |
+- ✅ Private keys are never exposed to the attacker
+- ✅ Messages can only be decrypted by the intended recipient
+- ✅ Old messages stay secure even if current keys are compromised (forward secrecy)
+- ✅ Future messages become secure after a compromise (post-compromise security)
+- ✅ All 4 X3DH DH operations execute correctly
 
 ## Troubleshooting
 
-### PROVERIF Not Found
+**"proverif: command not found"**
 
 ```bash
 opam install proverif
 export PATH="$HOME/.opam/default/bin:$PATH"
 ```
 
-### Compilation Errors
-
-Check PROVERIF version - requires 2.05+.
-
-## Documentation
-
-- **Proof results**: [FORMAL_PROOF_STATUS.md](FORMAL_PROOF_STATUS.md)
-- **Installation**: [INSTALLATION.md](INSTALLATION.md)
+**Compilation errors**: ProVerif 2.05+ is required. Check version with `proverif -help`

@@ -132,8 +132,9 @@ if [ $PASSED_MODELS -eq $TOTAL_MODELS ]; then
     echo "  • Message Authentication: Encryption ⇒ decryption correspondence"
     echo ""
     echo "Documentation:"
-    echo "  • detailed proofs: docs/PROVERIF_PROOFS.md"
     echo "  • model status: docs/FORMAL_PROOF_STATUS.md"
+    echo "  • constants: docs/HKDF_CONSTANTS.md"
+    echo "  • guide: docs/VERIFICATION_GUIDE.md"
     echo ""
     exit 0
 else

@@ -1,16 +1,16 @@
 (******************************************************************
- *                                                                *
- *  X3DH Protocol Model - PROVERIF Version                         *
- *                                                                *
- *  Migrated from CryptoVerif x3dh_working.cv                     *
- *                                                                *
- *  DH Operations in correct order:                                *
- *    DH1 = DH(IK_B, SPK_A) - Bob's identity key x Alice's signed pre-key *
- *    DH2 = DH(IK_B, OPK_A) - Bob's identity key x Alice's one-time pre-key *
- *    DH3 = DH(IK_A, SPK_B) - Alice's identity key x Bob's signed pre-key *
- *    DH4 = DH(IK_A, OPK_B) - Alice's identity key x Bob's one-time pre-key *
- *                                                                *
- ******************************************************************)
+  *                                                                *
+  *  X3DH Protocol Model - PROVERIF Version                         *
+  *                                                                *
+  *  Migrated from CryptoVerif x3dh_working.cv                     *
+  *                                                                *
+  *  DH Operations matching Rust implementation:                   *
+  *    DH1 = DH(Identity_Alice, SignedPreKey_Bob)                  *
+  *    DH2 = DH(Ephemeral_Alice, Identity_Bob)                     *
+  *    DH3 = DH(Ephemeral_Alice, SignedPreKey_Bob)                 *
+  *    DH4 = DH(Ephemeral_Alice, OneTimePreKey_Bob)                 *
+  *                                                                *
+  ******************************************************************)
 
 type key.
 type skey.
@@ -35,22 +35,26 @@ query attacker(sk).
 query x: bitstring; inj-event(alice_initiates) ==> inj-event(bob_responds).
 query x: bitstring; inj-event(x3dh_secret(x)).
 
-free ik_b: skey [private].
-free spk_b: pkey [private].
 free sk: skey [private].
+free identity_a: skey [private].
+free ephemeral_a: skey [private].
+free identity_b_pub: pkey [private].
+free signed_prekey_b_pub: pkey [private].
+free one_time_prekey_b_pub: pkey [private].
 
 let processA =
-  new spk_a: pkey;
-  new opk_a: pkey;
   event alice_initiates;
-  let dh1 = compute_dh(ik_b, spk_a) in
+  (* DH1 = DH(Identity_Alice, SignedPreKey_Bob) *)
+  let dh1 = compute_dh(identity_a, signed_prekey_b_pub) in
   event dh1_computed(dh1);
-  let dh2 = compute_dh(ik_b, opk_a) in
+  (* DH2 = DH(Ephemeral_Alice, Identity_Bob) *)
+  let dh2 = compute_dh(ephemeral_a, identity_b_pub) in
   event dh2_computed(dh2);
-  let dh3 = compute_dh(sk, spk_b) in
+  (* DH3 = DH(Ephemeral_Alice, SignedPreKey_Bob) *)
+  let dh3 = compute_dh(ephemeral_a, signed_prekey_b_pub) in
   event dh3_computed(dh3);
-  let dh4 = compute_dh(sk, spk_b) in
-  event dh4_computed(dh4);
+  (* DH4 = DH(Ephemeral_Alice, OneTimePreKey_Bob) *)
+  let dh4 = compute_dh(ephemeral_a, one_time_prekey_b_pub) in
   let combined = concat(dh1, concat(dh2, concat(dh3, dh4))) in
   let root = hkdf(combined) in
   event root_derived(root);

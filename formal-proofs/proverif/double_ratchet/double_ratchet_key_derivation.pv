@@ -23,9 +23,10 @@ free c: channel [private].
 fun dh(skey, bitstring): bitstring.
 fun concat(bitstring, bitstring): bitstring.
 fun concat3(bitstring, bitstring, bitstring): bitstring.
-fun hkdf_root_key(): bitstring.
+fun hkdf_salt_dh_ratchet(): bitstring.
 fun hkdf_info_chain_key(): bitstring.
 fun hkdf_info_message_key(): bitstring.
+fun hkdf_signal_chain_salt(): bitstring.
 fun hkdf(bitstring, bitstring): bitstring.
 fun aad_format(bitstring, bitstring, bitstring): bitstring.
 
@@ -40,7 +41,6 @@ free ik_a: skey [private].
 free ik_b: skey [private].
 free dh_public_key: bitstring [private].
 free dh_output: bitstring [private].
-free root_key: bitstring [private].
 free chain_key: bitstring [private].
 free message_key: bitstring [private].
 free message_number: bitstring [private].
@@ -71,8 +71,8 @@ query x: bitstring; (inj-event(message_key_derived(x)) ==> inj-event(message_enc
 let processA =
   let dh_out = dh(ik_a, dh_public_key) in
   event dh_computed(dh_out);
-  let info_root = hkdf_root_key() in
-  let root_new = hkdf(dh_output, info_root) in
+  let salt_dh_ratchet = hkdf_salt_dh_ratchet() in
+  let root_new = hkdf(dh_output, salt_dh_ratchet) in
   event root_key_derived(root_new);
   let info_chain = hkdf_info_chain_key() in
   let chain_new = hkdf(root_new, info_chain) in

@@ -34,7 +34,7 @@ fun hkdf_info_x3dh(): bitstring.
 fun hkdf_salt_dh_ratchet(): bitstring.
 fun hkdf_info_chain_key(): bitstring.
 fun hkdf_info_message_key(): bitstring.
-fun byte_one(): bitstring.
+fun byte_one_val(bitstring): bitstring.
 fun hkdf(bitstring, bitstring): bitstring.
 
 event alice_initiates_x3dh.
@@ -113,9 +113,10 @@ let process_dr_ratchet =
   let info = hkdf_info_chain_key() in
   let new_root = hkdf(combined, info) in
   event dh_ratchet_occurred(new_root);
-  let recv_chain = concat(new_root, byte_one()) in
+  let byte_one_val = byte_one_val(new_root) in
+  let recv_chain = concat(new_root, byte_one_val) in
   event receiving_chain_key_derived(recv_chain);
-  let msg_key = concat(recv_chain, byte_one()) in
+  let msg_key = concat(recv_chain, byte_one_val) in
   event message_key_derived(msg_key);
   out(c, msg_key).
 

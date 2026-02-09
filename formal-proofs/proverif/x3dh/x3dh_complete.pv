@@ -1,23 +1,23 @@
 (******************************************************************
- *                                                                *
- *  X3DH Protocol - Complete PROVERIF Model                        *
- *                                                                *
- *  All 4 DH operations in correct order from implementation       *
- *  HKDF with implementation constants                             *
- *  Full security properties: authentication, forward secrecy,   *
- *  post-compromise security                                     *
- *                                                                *
- *  From src/rust/x3dh.rs:43-50:                                   *
- *    DH1 = DH(IK_B, SPK_A) - Bob's identity key x Alice's signed pre-key *
- *    DH2 = DH(IK_B, OPK_A) - Bob's identity key x Alice's one-time pre-key *
- *    DH3 = DH(IK_A, SPK_B) - Alice's identity key x Bob's signed pre-key *
- *    DH4 = DH(IK_A, OPK_B) - Alice's identity key x Bob's one-time pre-key *
- *                                                                *
- *  HKDF constants from docs/HKDF_CONSTANTS_REFERENCE.md:          *
- *    Salt: "Signal_X3DH_Salt"                                    *
- *    Info: "Signal_X3DH_Key_Derivation"                         *
- *                                                                *
- ******************************************************************)
+  *                                                                *
+  *  X3DH Protocol - Complete PROVERIF Model                        *
+  *                                                                *
+  *  All 4 DH operations matching Rust implementation                *
+  *  HKDF with implementation constants                             *
+  *  Full security properties: authentication, forward secrecy,   *
+  *  post-compromise security                                     *
+  *                                                                *
+  *  From src/rust/x3dh.rs:43-56 (Alice's perspective):             *
+  *    DH1 = DH(Identity_Alice, SignedPreKey_Bob)                  *
+  *    DH2 = DH(Ephemeral_Alice, Identity_Bob)                     *
+  *    DH3 = DH(Ephemeral_Alice, SignedPreKey_Bob)                 *
+  *    DH4 = DH(Ephemeral_Alice, OneTimePreKey_Bob)                 *
+  *                                                                *
+  *  HKDF constants from docs/HKDF_CONSTANTS.md:                    *
+  *    Salt: "Signal_X3DH_Salt"                                    *
+  *    Info: "Signal_X3DH_Key_Derivation"                         *
+  *                                                                *
+  ******************************************************************)
 
 type key.
 type skey.
@@ -42,13 +42,12 @@ event root_derived(bitstring).
 event alice_initiates.
 event bob_responds.
 
-free ik_b: skey [private].
-free ik_a: skey [private].
+free identity_a_priv: skey [private].
+free signed_prekey_b: bitstring [private].
+free ephemeral_a_priv: skey [private].
+free identity_b: bitstring [private].
+free one_time_prekey_b: bitstring [private].
 free sk: skey [private].
-free spk_b: bitstring [private].
-free spk_a: bitstring [private].
-free opk_b: bitstring [private].
-free opk_a: bitstring [private].
 
 query attacker(sk).
 
@@ -77,13 +76,17 @@ query x: bitstring; inj-event(dh1_computed(x)) ==> inj-event(dh3_computed(x)).
 
 let processA =
   event alice_initiates;
-  let dh1 = dh(ik_b, spk_a) in
+  (* DH1 = DH(Identity_Alice, SignedPreKey_Bob) *)
+  let dh1 = dh(identity_a_priv, signed_prekey_b) in
   event dh1_computed(dh1);
-  let dh2 = dh(ik_b, opk_a) in
+  (* DH2 = DH(Ephemeral_Alice, Identity_Bob) *)
+  let dh2 = dh(ephemeral_a_priv, identity_b) in
   event dh2_computed(dh2);
-  let dh3 = dh(ik_a, spk_b) in
+  (* DH3 = DH(Ephemeral_Alice, SignedPreKey_Bob) *)
+  let dh3 = dh(ephemeral_a_priv, signed_prekey_b) in
   event dh3_computed(dh3);
-  let dh4 = dh(ik_a, opk_b) in
+  (* DH4 = DH(Ephemeral_Alice, OneTimePreKey_Bob) *)
+  let dh4 = dh(ephemeral_a_priv, one_time_prekey_b) in
   event dh4_computed(dh4);
   let combined = concat(dh1, concat(dh2, concat(dh3, dh4))) in
   let salt = hkdf_salt_x3dh() in

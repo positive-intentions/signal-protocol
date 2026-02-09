@@ -1,64 +1,55 @@
-# PROVERIF Installation Guide
+# PROVERIF Installation
 
-## Overview
-
-This guide explains how to install PROVERIF and set up the development environment for formal verification of the Signal Protocol implementation.
+PROVERIF is needed to run the formal verification models.
 
 ## Prerequisites
 
-- OCaml (version 4.08 or later)
+- OCaml 4.08 or newer
 - opam (OCaml package manager)
 
-## Installation Steps
-
-### 1. Install OCaml and opam
+## Installation
 
 ```bash
-# On Ubuntu/Debian
+# Install OCaml and opam on Ubuntu/Debian
 sudo apt-get install ocaml opam
 
 # Initialize opam
 opam init
 eval $(opam env)
-```
 
-### 2. Install PROVERIF
-
-```bash
+# Install PROVERIF
 opam install proverif
 export PATH="$HOME/.opam/default/bin:$PATH"
 ```
 
-### 3. Verify Installation
+## Verify Installation
 
 ```bash
 proverif -help | head -1
-# Should output: Proverif 2.05. ...
 ```
 
-## Running Proofs
+Should show version 2.05 or higher.
 
-### Quick Test
+## Running the Proofs
 
 ```bash
 cd formal-proofs
-./test_proverif_quick.sh          # Fast pass/fail check
-./test_proverif.sh               # Detailed security analysis
+./test_proverif.sh
 ```
 
-### Run Specific Model
+Or run individual models:
 
 ```bash
 proverif proverif/x3dh/x3dh_complete.pv
+proverif proverif/double_ratchet/double_ratchet_security.pv
 ```
 
 ## Troubleshooting
 
-### Common Issues
+**"proverif: command not found"**
 
-1. **PROVERIF not found**: Ensure `~/.opam/default/bin` is in your PATH
-2. **Compilation errors**: Check PROVERIF version (requires 2.05+)
+```bash
+export PATH="$HOME/.opam/default/bin:$PATH"
+```
 
-### Getting Help
-
-- PROVERIF documentation: https://proverif.inria.fr
+**Compilation errors**: Ensure you have PROVERIF 2.05 or newer
