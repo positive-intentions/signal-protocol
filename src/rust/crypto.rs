@@ -9,8 +9,6 @@ use wasm_bindgen::prelude::*;
 use js_sys::Uint8Array;
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
-use x25519_dalek::{StaticSecret as X25519StaticSecret, PublicKey as X25519PublicKey};
-use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use crate::rust::error::SignalError;
 
 /// Utility function to convert JavaScript Uint8Array to Rust Vec<u8>
@@ -36,139 +34,31 @@ fn log(s: &str) {
     }
 }
 
-/// Validate that a public key is a valid X25519 point
-///
-/// Performs basic validation to ensure the key is the correct length
-/// and represents a valid curve point. X25519 automatically clamps scalars
-/// and rejects low-order points, but we still validate input format.
-///
-/// ## Parameters
-/// - `public_key`: The public key bytes to validate
-///
-/// ## Returns
-/// - `Ok(())` if valid
-/// - `Err(SignalError)` if invalid
+/// Validate that a public key is a valid X25519 point - delegates to core
 pub(crate) fn validate_x25519_public_key(public_key: &[u8]) -> Result<(), SignalError> {
-    if public_key.len() != 32 {
-        return Err(SignalError::InvalidInput(format!(
-            "X25519 public key must be 32 bytes, got {}",
-            public_key.len()
-        )));
-    }
-
-    // X25519 accepts all 32-byte values as valid points (with clamping)
-    // The protocol automatically handles low-order points
-    Ok(())
+    signal_protocol_core::validate_x25519_public_key(public_key)
 }
 
-/// Perform X25519 Elliptic Curve Diffie-Hellman key agreement
-///
-/// This function implements real X25519 ECDH using Curve25519 scalar multiplication.
-/// Unlike the previous fake implementation, this provides actual cryptographic security.
-///
-/// ## Algorithm
-/// Computes: shared_secret = private_scalar * public_point
-/// Uses Montgomery curve (Curve25519) operations for efficient constant-time computation.
-///
-/// ## Security Properties
-/// - **Real Diffie-Hellman**: Uses elliptic curve scalar multiplication
-/// - **Constant-time**: Operations take the same time regardless of input values
-/// - **Commutative**: A's secret * B's public = B's secret * A's public
-/// - **128-bit security**: Equivalent to AES-128
-/// - **Side-channel resistant**: Protected against timing attacks
-///
-/// ## Parameters
-/// - `private_key`: The caller's X25519 private scalar (32 bytes)
-/// - `public_key`: The other party's X25519 public point (32 bytes)
-///
-/// ## Returns
-/// A 32-byte shared secret
-///
-/// ## Errors
-/// Returns error if keys are invalid or ECDH operation fails
+/// Perform X25519 ECDH - delegates to core
 pub(crate) fn x25519_ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u8>, SignalError> {
-    // Validate input lengths
-    if private_key.len() != 32 {
-        return Err(SignalError::InvalidInput(format!(
-            "Private key must be 32 bytes, got {}",
-            private_key.len()
-        )));
-    }
-
-    validate_x25519_public_key(public_key)?;
-
-    // Convert bytes to X25519 types
-    let mut private_bytes = [0u8; 32];
-    private_bytes.copy_from_slice(private_key);
-    let secret = X25519StaticSecret::from(private_bytes);
-
-    let mut public_bytes = [0u8; 32];
-    public_bytes.copy_from_slice(public_key);
-    let public = X25519PublicKey::from(public_bytes);
-
-    // Perform the actual ECDH operation (scalar multiplication)
-    let shared_secret = secret.diffie_hellman(&public);
-
-    // Return the shared secret bytes
-    Ok(shared_secret.as_bytes().to_vec())
+    signal_protocol_core::x25519_ecdh(private_key, public_key)
 }
 
 /// Legacy name for ECDH - kept for compatibility
 ///
-/// This function wraps the real X25519 ECDH implementation.
-/// Previously this was a fake implementation using SHA-256, now it's real crypto.
-pub(crate) fn simple_ecdh(private_key: &[u8], public_key: &[u8]) -> Vec<u8> {
-    // Call the real X25519 ECDH implementation
-    // In case of error, we panic because the caller expects Vec<u8> not Result
-    x25519_ecdh(private_key, public_key)
-        .unwrap_or_else(|e| panic!("ECDH failed: {}", e))
+/// Returns Result for panic-free operation. Callers should use ? or .unwrap().
+pub(crate) fn simple_ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u8>, SignalError> {
+    signal_protocol_core::simple_ecdh(private_key, public_key)
 }
 
-/// Internal function to sign data using Ed25519
-/// This is the core logic that can be tested without WASM bindings
+/// Internal function to sign data - delegates to core
 pub(crate) fn sign_data_internal(private_key: &[u8], data: &[u8]) -> Result<Vec<u8>, SignalError> {
-    if private_key.len() != 32 {
-        return Err(SignalError::InvalidInput("Ed25519 private key must be 32 bytes".to_string()));
-    }
-
-    // Convert bytes to Ed25519 signing key
-    let mut key_bytes = [0u8; 32];
-    key_bytes.copy_from_slice(private_key);
-    let signing_key = SigningKey::from_bytes(&key_bytes);
-
-    // Create Ed25519 signature
-    let signature: Signature = signing_key.sign(data);
-
-    Ok(signature.to_bytes().to_vec())
+    signal_protocol_core::sign_data_internal(private_key, data)
 }
 
-/// Internal function to verify Ed25519 signature
-/// This is the core logic that can be tested without WASM bindings
+/// Internal function to verify signature - delegates to core
 pub(crate) fn verify_signature_internal(public_key: &[u8], signature: &[u8], data: &[u8]) -> Result<bool, SignalError> {
-    if public_key.len() != 32 {
-        return Err(SignalError::InvalidInput("Ed25519 public key must be 32 bytes".to_string()));
-    }
-
-    if signature.len() != 64 {
-        return Err(SignalError::InvalidInput("Ed25519 signature must be 64 bytes".to_string()));
-    }
-
-    // Convert bytes to Ed25519 verifying key
-    let mut key_bytes = [0u8; 32];
-    key_bytes.copy_from_slice(public_key);
-
-    let verifying_key = VerifyingKey::from_bytes(&key_bytes)
-        .map_err(|e| SignalError::SignatureVerification(format!("Invalid Ed25519 public key: {}", e)))?;
-
-    // Convert bytes to signature
-    let mut sig_bytes = [0u8; 64];
-    sig_bytes.copy_from_slice(signature);
-    let signature = Signature::from_bytes(&sig_bytes);
-
-    // Verify the signature (constant-time operation)
-    let is_valid = verifying_key.verify(data, &signature).is_ok();
-
-    Ok(is_valid)
+    signal_protocol_core::verify_signature_internal(public_key, signature, data)
 }
 
 /// Sign data using Ed25519 digital signature algorithm
@@ -281,6 +171,7 @@ mod tests {
     use wasm_bindgen_test::*;
     use crate::rust::keys::generate_identity_keypair;
     use rand::RngCore;
+    use ed25519_dalek::SigningKey;
 
     /// Test X25519 ECDH commutativity (real elliptic curve DH)
     ///

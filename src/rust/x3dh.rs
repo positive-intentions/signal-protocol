@@ -9,11 +9,8 @@ use wasm_bindgen::prelude::*;
 use js_sys::Uint8Array;
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
-use sha2::Sha256;
-use hkdf::Hkdf;
-use crate::rust::crypto::{uint8_array_to_vec, simple_ecdh};
+use crate::rust::crypto::uint8_array_to_vec;
 use crate::rust::types::X3DHResult;
-use crate::rust::error::SignalError;
 
 /// Log messages to the browser console for debugging
 /// 
@@ -30,89 +27,45 @@ fn log(s: &str) {
     }
 }
 
-/// Internal function to initiate X3DH key exchange
-/// This is the core logic that can be tested without WASM bindings
+/// Internal function to initiate X3DH key exchange - delegates to core
 pub(crate) fn x3dh_initiate_internal(
     alice_identity_private: &[u8],
     alice_ephemeral_private: &[u8],
     bob_identity_public: &[u8],
     bob_signed_prekey_public: &[u8],
     bob_one_time_prekey_public: Option<&[u8]>,
-) -> Result<X3DHResult, SignalError> {
-    // Perform the three mandatory DH operations (X3DH protocol standard order)
-    let dh1 = simple_ecdh(alice_identity_private, bob_signed_prekey_public);
-    let dh2 = simple_ecdh(alice_ephemeral_private, bob_identity_public);
-    let dh3 = simple_ecdh(alice_ephemeral_private, bob_signed_prekey_public);
-    
-    // Concatenate the DH results in the standard order
-    let mut dh_concat = Vec::new();
-    dh_concat.extend_from_slice(&dh1);
-    dh_concat.extend_from_slice(&dh2);
-    dh_concat.extend_from_slice(&dh3);
-    
-    // Optional fourth DH with one-time prekey for additional forward secrecy
-    if let Some(bob_one_time_prekey) = bob_one_time_prekey_public {
-        let dh4 = simple_ecdh(alice_ephemeral_private, bob_one_time_prekey);
-        dh_concat.extend_from_slice(&dh4);
-    }
-    
-    // Derive the final shared secret using HKDF
-    let salt = b"Signal_X3DH_Salt";
-    let info = b"Signal_X3DH_Key_Derivation";
-    let hkdf = Hkdf::<Sha256>::new(Some(salt), &dh_concat);
-    let mut shared_secret = [0u8; 32];
-    hkdf.expand(info, &mut shared_secret)
-        .map_err(|e| SignalError::KeyDerivation(format!("HKDF expand failed: {}", e)))?;
-    
-    // Create associated data for additional protocol context
-    let associated_data = b"X3DH_Key_Exchange";
-    
+) -> Result<X3DHResult, crate::rust::error::SignalError> {
+    let core_result = signal_protocol_core::x3dh_initiate_internal(
+        alice_identity_private,
+        alice_ephemeral_private,
+        bob_identity_public,
+        bob_signed_prekey_public,
+        bob_one_time_prekey_public,
+    )?;
     Ok(X3DHResult {
-        shared_secret: shared_secret.to_vec(),
-        associated_data: associated_data.to_vec(),
+        shared_secret: core_result.shared_secret,
+        associated_data: core_result.associated_data,
     })
 }
 
-/// Internal function to respond to X3DH key exchange
-/// This is the core logic that can be tested without WASM bindings
+/// Internal function to respond to X3DH key exchange - delegates to core
 pub(crate) fn x3dh_respond_internal(
     bob_identity_private: &[u8],
     bob_signed_prekey_private: &[u8],
     bob_one_time_prekey_private: Option<&[u8]>,
     alice_identity_public: &[u8],
     alice_ephemeral_public: &[u8],
-) -> Result<X3DHResult, SignalError> {
-    // Perform the same DH operations as Alice
-    let dh1 = simple_ecdh(bob_signed_prekey_private, alice_identity_public);
-    let dh2 = simple_ecdh(bob_identity_private, alice_ephemeral_public);
-    let dh3 = simple_ecdh(bob_signed_prekey_private, alice_ephemeral_public);
-    
-    // Concatenate the DH results in the same order as Alice
-    let mut dh_concat = Vec::new();
-    dh_concat.extend_from_slice(&dh1);
-    dh_concat.extend_from_slice(&dh2);
-    dh_concat.extend_from_slice(&dh3);
-    
-    // Optional fourth DH with one-time prekey
-    if let Some(bob_one_time_prekey_private) = bob_one_time_prekey_private {
-        let dh4 = simple_ecdh(bob_one_time_prekey_private, alice_ephemeral_public);
-        dh_concat.extend_from_slice(&dh4);
-    }
-
-    // Derive the same shared secret using HKDF with identical parameters
-    let salt = b"Signal_X3DH_Salt";
-    let info = b"Signal_X3DH_Key_Derivation";
-    let hkdf = Hkdf::<Sha256>::new(Some(salt), &dh_concat);
-    let mut shared_secret = [0u8; 32];
-    hkdf.expand(info, &mut shared_secret)
-        .map_err(|e| SignalError::KeyDerivation(format!("HKDF expand failed: {}", e)))?;
-    
-    // Create the same associated data as Alice
-    let associated_data = b"X3DH_Key_Exchange";
-    
+) -> Result<X3DHResult, crate::rust::error::SignalError> {
+    let core_result = signal_protocol_core::x3dh_respond_internal(
+        bob_identity_private,
+        bob_signed_prekey_private,
+        bob_one_time_prekey_private,
+        alice_identity_public,
+        alice_ephemeral_public,
+    )?;
     Ok(X3DHResult {
-        shared_secret: shared_secret.to_vec(),
-        associated_data: associated_data.to_vec(),
+        shared_secret: core_result.shared_secret,
+        associated_data: core_result.associated_data,
     })
 }
 

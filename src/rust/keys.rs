@@ -1,24 +1,12 @@
 //! Cryptographic key generation for Signal Protocol
 //!
-//! This module handles the generation of various types of cryptographic keys
-//! used in the Signal Protocol. All key generation uses secure random number
-//! generation and follows Signal Protocol specifications.
-//!
-//! **PRODUCTION IMPLEMENTATION**: Uses real X25519 and Ed25519 cryptography
+//! Thin WASM wrapper around signal-protocol-core key generation.
 
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
-use x25519_dalek::{StaticSecret as X25519StaticSecret, PublicKey as X25519PublicKey};
-use rand::{RngCore, rngs::OsRng};
 use crate::rust::types::KeyPair;
 
-/// Log messages to the browser console for debugging
-///
-/// This helper function makes it easy to trace key generation operations
-/// during development and testing.
-///
-/// **SECURITY NOTE**: Only logs non-sensitive operational information
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -26,28 +14,16 @@ fn log(s: &str) {
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        // In native tests, just print to stdout for debugging
         eprintln!("{}", s);
     }
 }
 
-/// Internal function to generate an X25519 key pair
-/// This is the core logic that can be tested without WASM bindings
+/// Internal function to generate an X25519 key pair - delegates to core
 pub(crate) fn generate_x25519_keypair_internal() -> KeyPair {
-    // Generate a random scalar (private key) using cryptographically secure RNG
-    let mut private_key_bytes = [0u8; 32];
-    OsRng.fill_bytes(&mut private_key_bytes);
-
-    // Create X25519 static secret from random bytes
-    let static_secret = X25519StaticSecret::from(private_key_bytes);
-
-    // Derive the public key via scalar multiplication on the curve base point
-    // This is real elliptic curve cryptography, not a hash function
-    let public_key = X25519PublicKey::from(&static_secret);
-
+    let core_keypair = signal_protocol_core::generate_identity_keypair();
     KeyPair {
-        public_key: public_key.as_bytes().to_vec(),
-        private_key: static_secret.to_bytes().to_vec(),
+        public_key: core_keypair.public_key,
+        private_key: core_keypair.private_key,
     }
 }
 

@@ -612,8 +612,8 @@ mod native_tests {
         let keypair_b = generate_x25519_keypair_internal();
         
         // Test that simple_ecdh works (it wraps x25519_ecdh)
-        let shared_ab = simple_ecdh(&keypair_a.private_key, &keypair_b.public_key);
-        let shared_ba = simple_ecdh(&keypair_b.private_key, &keypair_a.public_key);
+        let shared_ab = simple_ecdh(&keypair_a.private_key, &keypair_b.public_key).unwrap();
+        let shared_ba = simple_ecdh(&keypair_b.private_key, &keypair_a.public_key).unwrap();
         
         assert_eq!(shared_ab, shared_ba);
         assert_eq!(shared_ab.len(), 32);
