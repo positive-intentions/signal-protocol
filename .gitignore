@@ -144,3 +144,5 @@ target/
 ./pkg-web/
 
 coverage-rust/
+
+hax-upstream/
