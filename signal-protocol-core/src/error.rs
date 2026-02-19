@@ -1,31 +1,32 @@
 //! Error handling for Signal Protocol core
 
-use thiserror::Error;
-
-/// Comprehensive error types for Signal Protocol operations
-#[derive(Error, Debug)]
+#[derive(Clone, Debug)]
 pub enum SignalError {
-    #[error("Key generation failed: {0}")]
     KeyGeneration(String),
-
-    #[error("Signature verification failed: {0}")]
     SignatureVerification(String),
-
-    #[error("Key exchange failed: {0}")]
     KeyExchange(String),
-
-    #[error("Encryption failed: {0}")]
     Encryption(String),
-
-    #[error("Decryption failed: {0}")]
     Decryption(String),
-
-    #[error("Key derivation failed: {0}")]
     KeyDerivation(String),
-
-    #[error("Serialization failed: {0}")]
     Serialization(String),
-
-    #[error("Invalid input: {0}")]
     InvalidInput(String),
 }
+
+impl std::fmt::Display for SignalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SignalError::KeyGeneration(s) => write!(f, "Key generation failed: {}", s),
+            SignalError::SignatureVerification(s) => {
+                write!(f, "Signature verification failed: {}", s)
+            }
+            SignalError::KeyExchange(s) => write!(f, "Key exchange failed: {}", s),
+            SignalError::Encryption(s) => write!(f, "Encryption failed: {}", s),
+            SignalError::Decryption(s) => write!(f, "Decryption failed: {}", s),
+            SignalError::KeyDerivation(s) => write!(f, "Key derivation failed: {}", s),
+            SignalError::Serialization(s) => write!(f, "Serialization failed: {}", s),
+            SignalError::InvalidInput(s) => write!(f, "Invalid input: {}", s),
+        }
+    }
+}
+
+impl std::error::Error for SignalError {}

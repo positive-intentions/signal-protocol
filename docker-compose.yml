@@ -1,0 +1,176 @@
+services:
+  build:
+    build:
+      context: .
+      target: wasm-builder
+    volumes:
+      - ./pkg:/app/pkg
+    command: npm run build:wasm:production
+
+  build-dev:
+    build:
+      context: .
+      target: wasm-builder
+    volumes:
+      - ./pkg:/app/pkg
+    command: npm run build:wasm
+
+  build-node:
+    build:
+      context: .
+      target: wasm-builder
+    volumes:
+      - ./pkg-node:/app/pkg-node
+    command: npm run build:wasm:node
+
+  test:
+    build:
+      context: .
+      target: test-runner
+    volumes:
+      - ./coverage:/app/coverage
+      - ./coverage-rust:/app/coverage-rust
+
+  test-rust:
+    build:
+      context: .
+      target: test-runner
+    command: npm run test:rust
+
+  test-wasm:
+    build:
+      context: .
+      target: test-runner
+    command: npm run test:wasm:node
+
+  test-jest:
+    build:
+      context: .
+      target: test-runner
+    command: npm run test:jest
+
+  dev:
+    build:
+      context: .
+      target: development
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./src:/app/src
+      - ./pkg:/app/pkg
+    environment:
+      - NODE_ENV=development
+
+  serve:
+    build:
+      context: .
+      target: production
+    ports:
+      - "8084:80"
+
+  storybook:
+    build:
+      context: .
+      target: development
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./src:/app/src
+      - ./pkg:/app/pkg
+    command: npm start
+
+  shell:
+    build:
+      context: .
+      target: development
+    volumes:
+      - ./pkg:/app/pkg
+      - ./src:/app/src
+    command: /bin/bash
+    stdin_open: true
+    tty: true
+
+  verification:
+    build:
+      context: .
+      target: verification
+    volumes:
+      - ./formal-proofs:/app/formal-proofs
+      - ./signal-protocol-core:/app/signal-protocol-core
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: cargo hax into fstar
+
+  hax-fstar:
+    build:
+      context: .
+      target: verification
+    volumes:
+      - ./formal-proofs:/app/formal-proofs
+      - ./signal-protocol-core:/app/signal-protocol-core
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: cargo hax into fstar
+
+  hax-coq:
+    build:
+      context: .
+      target: verification
+    volumes:
+      - ./formal-proofs:/app/formal-proofs
+      - ./signal-protocol-core:/app/signal-protocol-core
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: cargo hax into coq
+
+  hax-lean:
+    build:
+      context: .
+      target: verification
+    volumes:
+      - ./formal-proofs:/app/formal-proofs
+      - ./signal-protocol-core:/app/signal-protocol-core
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: cargo hax into lean
+
+  proverif:
+    build:
+      context: .
+      target: proverif
+    volumes:
+      - ./formal-proofs:/app/formal-proofs
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+  proverif-x3dh:
+    build:
+      context: .
+      target: proverif
+    volumes:
+      - ./formal-proofs:/app/formal-proofs
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: proverif proverif/x3dh/x3dh_complete.pv
+
+  proverif-double-ratchet:
+    build:
+      context: .
+      target: proverif
+    volumes:
+      - ./formal-proofs:/app/formal-proofs
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: proverif proverif/double_ratchet/double_ratchet_security.pv
+
+  formal-shell:
+    build:
+      context: .
+      target: verification
+    volumes:
+      - ./:/app
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: /bin/bash
+    stdin_open: true
+    tty: true

@@ -5,11 +5,11 @@
 //!
 //! **PRODUCTION IMPLEMENTATION**: Uses real X25519 ECDH and Ed25519 signatures
 
-use wasm_bindgen::prelude::*;
+use crate::rust::error::SignalError;
 use js_sys::Uint8Array;
+use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
-use crate::rust::error::SignalError;
 
 /// Utility function to convert JavaScript Uint8Array to Rust Vec<u8>
 ///
@@ -41,7 +41,7 @@ pub(crate) fn validate_x25519_public_key(public_key: &[u8]) -> Result<(), Signal
 
 /// Perform X25519 ECDH - delegates to core
 pub(crate) fn x25519_ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u8>, SignalError> {
-    signal_protocol_core::x25519_ecdh(private_key, public_key)
+    signal_protocol_core::crypto::x25519_ecdh(private_key, public_key)
 }
 
 /// Legacy name for ECDH - kept for compatibility
@@ -57,7 +57,11 @@ pub(crate) fn sign_data_internal(private_key: &[u8], data: &[u8]) -> Result<Vec<
 }
 
 /// Internal function to verify signature - delegates to core
-pub(crate) fn verify_signature_internal(public_key: &[u8], signature: &[u8], data: &[u8]) -> Result<bool, SignalError> {
+pub(crate) fn verify_signature_internal(
+    public_key: &[u8],
+    signature: &[u8],
+    data: &[u8],
+) -> Result<bool, SignalError> {
     signal_protocol_core::verify_signature_internal(public_key, signature, data)
 }
 
@@ -136,7 +140,11 @@ pub fn sign_data(private_key: &Uint8Array, data: &Uint8Array) -> Result<Uint8Arr
 /// - Returns error if signature is not exactly 64 bytes
 /// - Returns error if key format is invalid
 #[wasm_bindgen]
-pub fn verify_signature(public_key: &Uint8Array, signature: &Uint8Array, data: &Uint8Array) -> Result<bool, JsValue> {
+pub fn verify_signature(
+    public_key: &Uint8Array,
+    signature: &Uint8Array,
+    data: &Uint8Array,
+) -> Result<bool, JsValue> {
     log("Verifying signature with Ed25519");
 
     let public_key_bytes = uint8_array_to_vec(public_key);
@@ -168,10 +176,10 @@ pub(crate) fn simple_verify(_public_key: &[u8], _signature: &[u8], _data: &[u8])
 #[allow(dead_code)]
 mod tests {
     use super::*;
-    use wasm_bindgen_test::*;
     use crate::rust::keys::generate_identity_keypair;
-    use rand::RngCore;
     use ed25519_dalek::SigningKey;
+    use rand::RngCore;
+    use wasm_bindgen_test::*;
 
     /// Test X25519 ECDH commutativity (real elliptic curve DH)
     ///
@@ -193,7 +201,10 @@ mod tests {
         let shared_secret_ab = x25519_ecdh(&priv_a, &pub_b).unwrap();
         let shared_secret_ba = x25519_ecdh(&priv_b, &pub_a).unwrap();
 
-        assert_eq!(shared_secret_ab, shared_secret_ba, "ECDH must be commutative");
+        assert_eq!(
+            shared_secret_ab, shared_secret_ba,
+            "ECDH must be commutative"
+        );
         assert_eq!(shared_secret_ab.len(), 32, "Shared secret must be 32 bytes");
     }
 
@@ -212,7 +223,10 @@ mod tests {
         let shared_ab = x25519_ecdh(&priv_a, &pub_b).unwrap();
         let shared_ac = x25519_ecdh(&priv_a, &pub_c).unwrap();
 
-        assert_ne!(shared_ab, shared_ac, "Different keys must produce different secrets");
+        assert_ne!(
+            shared_ab, shared_ac,
+            "Different keys must produce different secrets"
+        );
     }
 
     /// Test X25519 key validation
@@ -311,7 +325,7 @@ mod tests {
     /// Test error handling for invalid key sizes
     #[wasm_bindgen_test]
     fn test_invalid_key_sizes() {
-        let short_key = Uint8Array::from(&[1u8; 16][..]);  // Too short
+        let short_key = Uint8Array::from(&[1u8; 16][..]); // Too short
         let data = Uint8Array::from("test".as_bytes());
 
         // Should fail with short private key for signing
@@ -322,7 +336,10 @@ mod tests {
         let valid_private_key = Uint8Array::from(&[1u8; 32][..]);
         let signature = sign_data(&valid_private_key, &data).unwrap();
         let verify_result = verify_signature(&short_key, &signature, &data);
-        assert!(verify_result.is_err(), "Verification with short key must fail");
+        assert!(
+            verify_result.is_err(),
+            "Verification with short key must fail"
+        );
     }
 
     /// Test error handling for invalid signature sizes
@@ -335,10 +352,13 @@ mod tests {
 
         let public_key = Uint8Array::from(&verifying_key.as_bytes()[..]);
         let data = Uint8Array::from("test".as_bytes());
-        let short_signature = Uint8Array::from(&[0u8; 32][..]);  // Too short (64 required)
+        let short_signature = Uint8Array::from(&[0u8; 32][..]); // Too short (64 required)
 
         let result = verify_signature(&public_key, &short_signature, &data);
-        assert!(result.is_err(), "Verification with short signature must fail");
+        assert!(
+            result.is_err(),
+            "Verification with short signature must fail"
+        );
     }
 
     /// Test ECDH with invalid inputs

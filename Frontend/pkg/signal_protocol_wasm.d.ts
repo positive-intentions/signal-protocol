@@ -508,101 +508,9 @@ export function free_keypair(_keypair: KeyPair): void;
  * ```
  */
 export function free_buffer(_buffer: Uint8Array): void;
-/**
- * Initialize a Double Ratchet state from a shared secret
- * 
- * This function initializes the Double Ratchet state after an X3DH key exchange.
- * The shared secret from X3DH becomes the initial root key, and the first chain
- * keys are derived based on whether this party is the initiator or responder.
- * 
- * ## Protocol Flow
- * 
- * 1. **Initiator (Alice)**: Generates sending DH key pair immediately
- * 2. **Responder (Bob)**: Waits for first message to establish receiving chain
- * 3. Both parties derive their initial chain keys from the shared secret
- * 
- * ## Parameters
- * - `shared_secret`: The shared secret from X3DH key exchange (32 bytes)
- * - `is_initiator`: Whether this party initiates the conversation
- * 
- * ## Returns
- * An initialized `DoubleRatchetState` ready for message encryption/decryption
- * 
- * ## Example Usage
- * ```rust
- * let shared_secret = x3dh_result.shared_secret();
- * let alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
- * let bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
- * ```
- */
 export function initialize_double_ratchet(shared_secret: Uint8Array, is_initiator: boolean): DoubleRatchetState;
-/**
- * Encrypt a message using the Double Ratchet
- * 
- * This function encrypts a message using the current sending chain key,
- * derives a unique message key, and creates a message that includes all
- * information needed for decryption and ratchet state updates.
- * 
- * ## Process
- * 1. Derive message key from current sending chain key
- * 2. Encrypt plaintext using AES-256-GCM with derived key
- * 3. Create authenticated data including DH public key and message number
- * 4. Advance sending chain key for next message
- * 5. Return encrypted message with metadata
- * 
- * ## Parameters
- * - `state`: The Double Ratchet state (will be modified)
- * - `plaintext`: The message to encrypt
- * 
- * ## Returns
- * A `DoubleRatchetMessage` containing encrypted data and metadata
- * 
- * ## Errors
- * - Returns error if no sending chain key is available
- * - Returns error if encryption fails
- * - Returns error if chain key derivation fails
- */
 export function double_ratchet_encrypt(state: DoubleRatchetState, plaintext: Uint8Array): DoubleRatchetMessage;
-/**
- * Decrypt a message using the Double Ratchet
- * 
- * This function decrypts a Double Ratchet message, handling DH ratchet steps
- * if needed and managing out-of-order message delivery through skipped message keys.
- * 
- * ## Process
- * 1. Check for DH ratchet step (new DH public key)
- * 2. Handle skipped message keys for out-of-order delivery
- * 3. Derive or retrieve appropriate message key
- * 4. Decrypt message using AES-256-GCM
- * 5. Update ratchet state
- * 
- * ## Parameters
- * - `state`: The Double Ratchet state (will be modified)
- * - `message`: The encrypted message to decrypt
- * 
- * ## Returns
- * The decrypted plaintext as a Uint8Array
- * 
- * ## Errors
- * - Returns error if DH ratchet step fails
- * - Returns error if message key derivation fails  
- * - Returns error if decryption fails
- * - Returns error if authentication fails
- */
 export function double_ratchet_decrypt(state: DoubleRatchetState, message: DoubleRatchetMessage): Uint8Array;
-/**
- * Cleanup old skipped message keys
- * 
- * This function removes old skipped message keys to prevent memory exhaustion.
- * It should be called periodically to maintain reasonable memory usage.
- * 
- * ## Parameters
- * - `state`: The Double Ratchet state (will be modified)
- * - `max_keys`: Maximum number of skipped keys to keep
- * 
- * ## Returns
- * Number of keys removed
- */
 export function cleanup_skipped_message_keys(state: DoubleRatchetState, max_keys: number): number;
 /**
  * Initialize the WASM module
@@ -611,68 +519,20 @@ export function cleanup_skipped_message_keys(state: DoubleRatchetState, max_keys
  * It sets up error handling and logging for better debugging experience.
  */
 export function main(): void;
-/**
- * Result of Double Ratchet message encryption
- * 
- * Contains the encrypted message along with the DH public key and message number
- * needed for the recipient to decrypt the message and update their ratchet state.
- */
 export class DoubleRatchetMessage {
   private constructor();
   free(): void;
-  /**
-   * Get the ciphertext as a JavaScript Uint8Array
-   */
   readonly ciphertext: Uint8Array;
-  /**
-   * Get the DH public key as a JavaScript Uint8Array
-   */
   readonly dh_public_key: Uint8Array;
-  /**
-   * Get the message number
-   */
   readonly message_number: number;
-  /**
-   * Get the previous chain length
-   */
   readonly previous_chain_length: number;
 }
-/**
- * Double Ratchet state for one participant
- * 
- * This structure maintains all the cryptographic state needed for the Double Ratchet
- * algorithm. It includes root keys, chain keys, message numbers, and skipped message
- * keys for out-of-order message handling.
- * 
- * ## State Components
- * 
- * - **Root Key**: Used to derive new chain keys during DH ratchet steps
- * - **Chain Keys**: Used to derive message keys and advance the symmetric ratchet
- * - **DH Key Pairs**: Used for Diffie-Hellman ratchet steps
- * - **Message Numbers**: Track the current position in each chain
- * - **Skipped Keys**: Store keys for messages that haven't arrived yet
- */
 export class DoubleRatchetState {
   free(): void;
-  /**
-   * Create a new empty Double Ratchet state
-   */
   constructor();
-  /**
-   * Get the current root key
-   */
   readonly root_key: Uint8Array;
-  /**
-   * Get the sending message number
-   */
   readonly sending_message_number: number;
-  /**
-   * Get the receiving message number
-   */
   readonly receiving_message_number: number;
-  /**
-   * Get the number of skipped message keys stored
-   */
   readonly skipped_keys_count: number;
 }
 /**
