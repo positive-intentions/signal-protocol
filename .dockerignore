@@ -1,0 +1,41 @@
+# Build outputs
+pkg/
+pkg-node/
+pkg-bundler/
+dist/
+Frontend/
+storybook-static/
+coverage/
+coverage-rust/
+
+# Dependencies
+node_modules/
+
+# Rust build artifacts
+target/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test files (copied into image when needed)
+coverage/

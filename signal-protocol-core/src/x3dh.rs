@@ -1,12 +1,10 @@
 //! X3DH (Extended Triple Diffie-Hellman) key agreement protocol
 
-use sha2::Sha256;
-use hkdf::Hkdf;
-use crate::crypto::simple_ecdh;
-use crate::types::X3DHResult;
+use crate::crypto::{hkdf_derive, simple_ecdh};
 use crate::error::SignalError;
+use crate::types::X3DHResult;
 
-/// Internal function to initiate X3DH key exchange
+#[hax_lib::include]
 pub fn x3dh_initiate_internal(
     alice_identity_private: &[u8],
     alice_ephemeral_private: &[u8],
@@ -30,20 +28,18 @@ pub fn x3dh_initiate_internal(
 
     let salt = b"Signal_X3DH_Salt";
     let info = b"Signal_X3DH_Key_Derivation";
-    let hkdf = Hkdf::<Sha256>::new(Some(salt), &dh_concat);
-    let mut shared_secret = [0u8; 32];
-    hkdf.expand(info, &mut shared_secret)
-        .map_err(|e| SignalError::KeyDerivation(format!("HKDF expand failed: {}", e)))?;
+
+    let shared_secret = hkdf_derive(salt, &dh_concat, info, 32)?;
 
     let associated_data = b"X3DH_Key_Exchange";
 
     Ok(X3DHResult {
-        shared_secret: shared_secret.to_vec(),
+        shared_secret,
         associated_data: associated_data.to_vec(),
     })
 }
 
-/// Internal function to respond to X3DH key exchange
+#[hax_lib::include]
 pub fn x3dh_respond_internal(
     bob_identity_private: &[u8],
     bob_signed_prekey_private: &[u8],
@@ -67,15 +63,13 @@ pub fn x3dh_respond_internal(
 
     let salt = b"Signal_X3DH_Salt";
     let info = b"Signal_X3DH_Key_Derivation";
-    let hkdf = Hkdf::<Sha256>::new(Some(salt), &dh_concat);
-    let mut shared_secret = [0u8; 32];
-    hkdf.expand(info, &mut shared_secret)
-        .map_err(|e| SignalError::KeyDerivation(format!("HKDF expand failed: {}", e)))?;
+
+    let shared_secret = hkdf_derive(salt, &dh_concat, info, 32)?;
 
     let associated_data = b"X3DH_Key_Exchange";
 
     Ok(X3DHResult {
-        shared_secret: shared_secret.to_vec(),
+        shared_secret,
         associated_data: associated_data.to_vec(),
     })
 }

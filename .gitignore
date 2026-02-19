@@ -132,8 +132,8 @@ dist
 storybook-static
 dist
 
-# Rust
-/target/
+# Rust (match target in any subdirectory, e.g. signal-protocol-core/target/)
+target/
 # Cargo.lock
 
 # WASM

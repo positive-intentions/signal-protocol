@@ -1,22 +1,16 @@
 //! Double Ratchet Implementation for Signal Protocol
 
-use sha2::Sha256;
-use hkdf::Hkdf;
-use aes_gcm::{Aes256Gcm, aead::{AeadInPlace, KeyInit}, Tag};
-use aes_gcm::aead::generic_array::GenericArray;
-use rand::RngCore;
-use std::collections::HashMap;
-use crate::crypto::simple_ecdh;
+use crate::crypto::{hkdf_derive, simple_ecdh};
+use crate::error::SignalError;
 use crate::keys::generate_identity_keypair;
 use crate::types::KeyPair;
-use crate::error::SignalError;
+use std::collections::BTreeMap;
 
 const MAX_SKIPPED_MESSAGE_KEYS: usize = 1000;
 const HKDF_INFO_CHAIN_KEY: &[u8] = b"Signal_DoubleRatchet_ChainKey";
 const HKDF_INFO_MESSAGE_KEY: &[u8] = b"Signal_DoubleRatchet_MessageKey";
 
-/// Double Ratchet state for one participant
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DoubleRatchetState {
     pub root_key: Vec<u8>,
     pub sending_chain_key: Option<Vec<u8>>,
@@ -26,10 +20,11 @@ pub struct DoubleRatchetState {
     pub sending_message_number: u32,
     pub receiving_message_number: u32,
     pub previous_chain_length: u32,
-    pub skipped_message_keys: HashMap<String, Vec<u8>>,
+    pub skipped_message_keys: BTreeMap<String, Vec<u8>>,
 }
 
 impl DoubleRatchetState {
+    #[hax_lib::include]
     pub fn new() -> Self {
         DoubleRatchetState {
             root_key: vec![0u8; 32],
@@ -40,12 +35,11 @@ impl DoubleRatchetState {
             sending_message_number: 0,
             receiving_message_number: 0,
             previous_chain_length: 0,
-            skipped_message_keys: HashMap::new(),
+            skipped_message_keys: BTreeMap::new(),
         }
     }
 }
 
-/// Result of Double Ratchet message encryption
 #[derive(Clone, Debug)]
 pub struct DoubleRatchetMessage {
     pub ciphertext: Vec<u8>,
@@ -54,51 +48,41 @@ pub struct DoubleRatchetMessage {
     pub previous_chain_length: u32,
 }
 
-/// Derive a message key from a chain key
-#[cfg_attr(feature = "hax", hax_lib::include)]
+#[hax_lib::include]
 pub fn derive_message_key(chain_key: &[u8]) -> Result<Vec<u8>, SignalError> {
-    let hkdf = Hkdf::<Sha256>::new(Some(b"Signal_Message_Salt"), chain_key);
-    let mut message_key = [0u8; 32];
-    hkdf.expand(HKDF_INFO_MESSAGE_KEY, &mut message_key)
-        .map_err(|e| SignalError::KeyDerivation(format!("Message key derivation failed: {}", e)))?;
-    Ok(message_key.to_vec())
+    hkdf_derive(b"Signal_Message_Salt", chain_key, HKDF_INFO_MESSAGE_KEY, 32)
 }
 
-/// Derive the next chain key from the current chain key
-#[cfg_attr(feature = "hax", hax_lib::include)]
+#[hax_lib::include]
 pub fn derive_next_chain_key(chain_key: &[u8]) -> Result<Vec<u8>, SignalError> {
-    let hkdf = Hkdf::<Sha256>::new(Some(b"Signal_Chain_Salt"), chain_key);
-    let mut next_chain_key = [0u8; 32];
-    hkdf.expand(HKDF_INFO_CHAIN_KEY, &mut next_chain_key)
-        .map_err(|e| SignalError::KeyDerivation(format!("Next chain key derivation failed: {}", e)))?;
-    Ok(next_chain_key.to_vec())
+    hkdf_derive(b"Signal_Chain_Salt", chain_key, HKDF_INFO_CHAIN_KEY, 32)
 }
 
-/// Perform a DH ratchet step
+#[hax_lib::include]
 pub fn perform_dh_ratchet_step(
     state: &mut DoubleRatchetState,
     new_remote_public_key: &[u8],
 ) -> Result<(), SignalError> {
     let original_root_key = state.root_key.clone();
 
-    let (new_root_key_for_receiving, receiving_chain_key) = if let Some(ref current_dh_keypair) = state.sending_dh_keypair {
-        let dh_output = simple_ecdh(&current_dh_keypair.private_key, new_remote_public_key)?;
+    let (new_root_key_for_receiving, receiving_chain_key) =
+        if let Some(ref current_dh_keypair) = state.sending_dh_keypair {
+            let dh_output = simple_ecdh(&current_dh_keypair.private_key, new_remote_public_key)?;
 
-        let hkdf = Hkdf::<Sha256>::new(Some(b"Signal_DH_Ratchet"), &original_root_key);
-        let mut hkdf_output = [0u8; 64];
-        hkdf.expand(&dh_output, &mut hkdf_output)
-            .map_err(|e| SignalError::KeyDerivation(format!("DH ratchet HKDF failed: {}", e)))?;
+            let combined = hkdf_derive(b"Signal_DH_Ratchet", &original_root_key, &dh_output, 64)?;
 
-        let new_root_key = hkdf_output[0..32].to_vec();
-        let receiving_chain_key = hkdf_output[32..64].to_vec();
-        (new_root_key, receiving_chain_key)
-    } else {
-        let hkdf = Hkdf::<Sha256>::new(Some(b"Signal_Initial_Chain"), &state.root_key);
-        let mut receiving_chain_key = [0u8; 32];
-        hkdf.expand(HKDF_INFO_CHAIN_KEY, &mut receiving_chain_key)
-            .map_err(|e| SignalError::KeyDerivation(format!("Initial receiving chain derivation failed: {}", e)))?;
-        (state.root_key.clone(), receiving_chain_key.to_vec())
-    };
+            let new_root_key = combined[0..32].to_vec();
+            let recv_chain_key = combined[32..64].to_vec();
+            (new_root_key, recv_chain_key)
+        } else {
+            let recv_chain_key = hkdf_derive(
+                b"Signal_Initial_Chain",
+                &state.root_key,
+                HKDF_INFO_CHAIN_KEY,
+                32,
+            )?;
+            (state.root_key.clone(), recv_chain_key)
+        };
 
     state.root_key = new_root_key_for_receiving;
     state.receiving_chain_key = Some(receiving_chain_key);
@@ -115,13 +99,15 @@ pub fn perform_dh_ratchet_step(
 
     let sending_dh_output = simple_ecdh(&new_dh_keypair.private_key, new_remote_public_key)?;
 
-    let hkdf = Hkdf::<Sha256>::new(Some(b"Signal_DH_Ratchet"), root_key_for_sending);
-    let mut hkdf_output = [0u8; 64];
-    hkdf.expand(&sending_dh_output, &mut hkdf_output)
-        .map_err(|e| SignalError::KeyDerivation(format!("Sending chain HKDF failed: {}", e)))?;
+    let combined = hkdf_derive(
+        b"Signal_DH_Ratchet",
+        root_key_for_sending,
+        &sending_dh_output,
+        64,
+    )?;
 
-    state.root_key = hkdf_output[0..32].to_vec();
-    state.sending_chain_key = Some(hkdf_output[32..64].to_vec());
+    state.root_key = combined[0..32].to_vec();
+    state.sending_chain_key = Some(combined[32..64].to_vec());
     state.sending_dh_keypair = Some(new_dh_keypair);
     state.previous_chain_length = state.sending_message_number;
     state.sending_message_number = 0;
@@ -129,52 +115,59 @@ pub fn perform_dh_ratchet_step(
     Ok(())
 }
 
-/// Skip message keys for out-of-order messages
+#[hax_lib::include]
 pub fn skip_message_keys(
     state: &mut DoubleRatchetState,
     until_message_number: u32,
 ) -> Result<(), SignalError> {
-    if let Some(ref mut receiving_chain_key) = state.receiving_chain_key {
-        if state.receiving_message_number < until_message_number {
-            let skip_count = until_message_number - state.receiving_message_number;
-
-            if skip_count > MAX_SKIPPED_MESSAGE_KEYS as u32 {
-                return Err(SignalError::InvalidInput(
-                    format!("Too many skipped message keys: {}", skip_count)
-                ));
-            }
-
-            let dh_public_key_hex = if let Some(ref dh_key) = state.receiving_dh_public_key {
-                hex::encode(dh_key)
-            } else {
-                "none".to_string()
-            };
-
-            let mut current_chain_key = receiving_chain_key.clone();
-
-            while state.receiving_message_number < until_message_number {
-                let message_key = derive_message_key(&current_chain_key)?;
-                let key_id = format!("{}:{}", dh_public_key_hex, state.receiving_message_number);
-                state.skipped_message_keys.insert(key_id.clone(), message_key);
-
-                current_chain_key = derive_next_chain_key(&current_chain_key)?;
-                state.receiving_message_number += 1;
-            }
-
-            *receiving_chain_key = current_chain_key;
-        }
+    if state.receiving_message_number >= until_message_number {
+        return Ok(());
     }
+
+    let receiving_chain_key = match &state.receiving_chain_key {
+        Some(key) => key.clone(),
+        None => return Ok(()),
+    };
+
+    let skip_count = until_message_number - state.receiving_message_number;
+
+    if skip_count > MAX_SKIPPED_MESSAGE_KEYS as u32 {
+        return Err(SignalError::InvalidInput(format!(
+            "Too many skipped message keys: {}",
+            skip_count
+        )));
+    }
+
+    let dh_public_key_hex = match &state.receiving_dh_public_key {
+        Some(dh_key) => hex::encode(dh_key),
+        None => "none".to_string(),
+    };
+
+    let mut current_chain_key = receiving_chain_key;
+
+    while state.receiving_message_number < until_message_number {
+        let message_key = derive_message_key(&current_chain_key)?;
+        let key_id = format!("{}:{}", dh_public_key_hex, state.receiving_message_number);
+        state.skipped_message_keys.insert(key_id, message_key);
+
+        current_chain_key = derive_next_chain_key(&current_chain_key)?;
+        state.receiving_message_number += 1;
+    }
+
+    state.receiving_chain_key = Some(current_chain_key);
 
     Ok(())
 }
 
-/// Initialize Double Ratchet state from shared secret
+#[hax_lib::include]
 pub fn initialize_double_ratchet_internal(
     shared_secret: &[u8],
     is_initiator: bool,
 ) -> Result<DoubleRatchetState, SignalError> {
     if shared_secret.len() != 32 {
-        return Err(SignalError::InvalidInput("Shared secret must be 32 bytes".to_string()));
+        return Err(SignalError::InvalidInput(
+            "Shared secret must be 32 bytes".to_string(),
+        ));
     }
 
     let mut state = DoubleRatchetState::new();
@@ -184,12 +177,14 @@ pub fn initialize_double_ratchet_internal(
         let keypair = generate_identity_keypair();
         state.sending_dh_keypair = Some(keypair);
 
-        let hkdf = Hkdf::<Sha256>::new(Some(b"Signal_Initial_Chain"), &state.root_key);
-        let mut initial_chain_key = [0u8; 32];
-        hkdf.expand(HKDF_INFO_CHAIN_KEY, &mut initial_chain_key)
-            .map_err(|e| SignalError::KeyDerivation(format!("Initial chain key derivation failed: {}", e)))?;
+        let initial_chain_key = hkdf_derive(
+            b"Signal_Initial_Chain",
+            &state.root_key,
+            HKDF_INFO_CHAIN_KEY,
+            32,
+        )?;
 
-        state.sending_chain_key = Some(initial_chain_key.to_vec());
+        state.sending_chain_key = Some(initial_chain_key);
         state.sending_message_number = 0;
     } else {
         state.receiving_message_number = 0;
@@ -199,38 +194,33 @@ pub fn initialize_double_ratchet_internal(
     Ok(state)
 }
 
-/// Internal encrypt for native testing
+#[hax_lib::include]
 pub fn double_ratchet_encrypt_internal(
     state: &mut DoubleRatchetState,
     plaintext: &[u8],
 ) -> Result<DoubleRatchetMessage, SignalError> {
-    let sending_chain_key = state.sending_chain_key.as_ref()
+    let sending_chain_key = state
+        .sending_chain_key
+        .as_ref()
         .ok_or_else(|| SignalError::InvalidInput("No sending chain key available".to_string()))?;
 
-    let sending_dh_keypair = state.sending_dh_keypair.as_ref()
+    let sending_dh_keypair = state
+        .sending_dh_keypair
+        .as_ref()
         .ok_or_else(|| SignalError::InvalidInput("No sending DH keypair available".to_string()))?;
 
     let message_key = derive_message_key(sending_chain_key)?;
 
-    let mut nonce_bytes = [0u8; 12];
-    rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
+    let (ciphertext, nonce) = aead_encrypt(&message_key, plaintext, &{
+        let mut aad = Vec::new();
+        aad.extend_from_slice(&sending_dh_keypair.public_key);
+        aad.extend_from_slice(&state.sending_message_number.to_be_bytes());
+        aad.extend_from_slice(&state.previous_chain_length.to_be_bytes());
+        aad
+    })?;
 
-    let mut aad = Vec::new();
-    aad.extend_from_slice(&sending_dh_keypair.public_key);
-    aad.extend_from_slice(&state.sending_message_number.to_be_bytes());
-    aad.extend_from_slice(&state.previous_chain_length.to_be_bytes());
-
-    let key = GenericArray::from_slice(&message_key);
-    let cipher = Aes256Gcm::new(key);
-    let nonce_ga = GenericArray::from_slice(&nonce_bytes);
-
-    let mut buffer = plaintext.to_vec();
-    let tag = cipher.encrypt_in_place_detached(nonce_ga, aad.as_slice(), &mut buffer)
-        .map_err(|e| SignalError::Encryption(format!("AES-GCM encryption failed: {}", e)))?;
-
-    let mut result_ciphertext = nonce_bytes.to_vec();
-    result_ciphertext.extend_from_slice(&buffer);
-    result_ciphertext.extend_from_slice(tag.as_slice());
+    let mut result_ciphertext = nonce;
+    result_ciphertext.extend_from_slice(&ciphertext);
 
     let message = DoubleRatchetMessage {
         ciphertext: result_ciphertext,
@@ -246,7 +236,7 @@ pub fn double_ratchet_encrypt_internal(
     Ok(message)
 }
 
-/// Internal decrypt for native testing
+#[hax_lib::include]
 pub fn double_ratchet_decrypt_internal(
     state: &mut DoubleRatchetState,
     message: &DoubleRatchetMessage,
@@ -275,8 +265,9 @@ pub fn double_ratchet_decrypt_internal(
             skip_message_keys(state, message_number)?;
         }
 
-        let receiving_chain_key = state.receiving_chain_key.as_ref()
-            .ok_or_else(|| SignalError::InvalidInput("No receiving chain key available".to_string()))?;
+        let receiving_chain_key = state.receiving_chain_key.as_ref().ok_or_else(|| {
+            SignalError::InvalidInput("No receiving chain key available".to_string())
+        })?;
 
         if message_number != state.receiving_message_number {
             return Err(SignalError::InvalidInput(format!(
@@ -294,32 +285,27 @@ pub fn double_ratchet_decrypt_internal(
         message_key
     };
 
-    if ciphertext_bytes.len() < 12 + 16 {
-        return Err(SignalError::Decryption("Ciphertext too short for nonce and tag".to_string()));
+    if ciphertext_bytes.len() < 12 {
+        return Err(SignalError::Decryption(
+            "Ciphertext too short for nonce".to_string(),
+        ));
     }
 
     let nonce_bytes = &ciphertext_bytes[..12];
-    let encrypted_data = &ciphertext_bytes[12..ciphertext_bytes.len() - 16];
-    let tag_bytes = &ciphertext_bytes[ciphertext_bytes.len() - 16..];
+    let encrypted_data = &ciphertext_bytes[12..];
 
-    let mut aad = Vec::new();
-    aad.extend_from_slice(message_dh_key);
-    aad.extend_from_slice(&message.message_number.to_be_bytes());
-    aad.extend_from_slice(&message.previous_chain_length.to_be_bytes());
+    let aad = {
+        let mut aad = Vec::new();
+        aad.extend_from_slice(message_dh_key);
+        aad.extend_from_slice(&message.message_number.to_be_bytes());
+        aad.extend_from_slice(&message.previous_chain_length.to_be_bytes());
+        aad
+    };
 
-    let key = GenericArray::from_slice(&message_key);
-    let cipher = Aes256Gcm::new(key);
-    let nonce_ga = GenericArray::from_slice(nonce_bytes);
-    let tag = Tag::from_slice(tag_bytes);
-
-    let mut buffer = encrypted_data.to_vec();
-    cipher.decrypt_in_place_detached(nonce_ga, aad.as_slice(), &mut buffer, tag)
-        .map_err(|e| SignalError::Decryption(format!("AES-GCM decryption failed: {}", e)))?;
-
-    Ok(buffer)
+    aead_decrypt(&message_key, encrypted_data, nonce_bytes, &aad)
 }
 
-/// Cleanup old skipped message keys
+#[hax_lib::include]
 pub fn cleanup_skipped_message_keys_internal(
     state: &mut DoubleRatchetState,
     max_keys: usize,
@@ -340,4 +326,86 @@ pub fn cleanup_skipped_message_keys_internal(
     }
 
     removed_count
+}
+
+#[hax_lib::include]
+fn aead_encrypt(
+    key: &[u8],
+    plaintext: &[u8],
+    aad: &[u8],
+) -> Result<(Vec<u8>, Vec<u8>), SignalError> {
+    #[cfg(feature = "crypto-backend")]
+    {
+        use aes_gcm::{
+            aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
+            Aes256Gcm,
+        };
+        use rand::RngCore;
+
+        let mut nonce_bytes = [0u8; 12];
+        rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
+
+        let key_ga = GenericArray::from_slice(key);
+        let cipher = Aes256Gcm::new(key_ga);
+        let nonce_ga = GenericArray::from_slice(&nonce_bytes);
+
+        let mut buffer = plaintext.to_vec();
+        let tag = cipher
+            .encrypt_in_place_detached(nonce_ga, aad, &mut buffer)
+            .map_err(|e| SignalError::Encryption(format!("AES-GCM encryption failed: {}", e)))?;
+
+        buffer.extend_from_slice(tag.as_slice());
+        Ok((buffer, nonce_bytes.to_vec()))
+    }
+
+    #[cfg(not(feature = "crypto-backend"))]
+    {
+        let _ = (key, aad);
+        let nonce = vec![0u8; 12];
+        Ok((plaintext.to_vec(), nonce))
+    }
+}
+
+#[hax_lib::include]
+fn aead_decrypt(
+    key: &[u8],
+    ciphertext: &[u8],
+    nonce: &[u8],
+    aad: &[u8],
+) -> Result<Vec<u8>, SignalError> {
+    #[cfg(feature = "crypto-backend")]
+    {
+        use aes_gcm::{
+            aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
+            Aes256Gcm,
+        };
+        type AesGcmTag = aes_gcm::aead::Tag<Aes256Gcm>;
+
+        if ciphertext.len() < 16 {
+            return Err(SignalError::Decryption(
+                "Ciphertext too short for tag".to_string(),
+            ));
+        }
+
+        let key_ga = GenericArray::from_slice(key);
+        let cipher = Aes256Gcm::new(key_ga);
+        let nonce_ga = GenericArray::from_slice(nonce);
+
+        let encrypted_data = &ciphertext[..ciphertext.len() - 16];
+        let tag_bytes = &ciphertext[ciphertext.len() - 16..];
+        let tag = AesGcmTag::from_slice(tag_bytes);
+
+        let mut buffer = encrypted_data.to_vec();
+        cipher
+            .decrypt_in_place_detached(nonce_ga, aad, &mut buffer, tag)
+            .map_err(|e| SignalError::Decryption(format!("AES-GCM decryption failed: {}", e)))?;
+
+        Ok(buffer)
+    }
+
+    #[cfg(not(feature = "crypto-backend"))]
+    {
+        let _ = (key, nonce, aad);
+        Ok(ciphertext.to_vec())
+    }
 }

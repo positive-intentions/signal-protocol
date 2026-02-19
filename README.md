@@ -18,16 +18,35 @@ This repository contains a complete implementation of the Signal Protocol crypto
 - **TypeScript/JavaScript Bindings**: Easy-to-use JavaScript API
 - **Storybook Demos**: Interactive browser-based demonstrations of all functionality
 - **Comprehensive Tests**: Unit tests for Rust, WASM, and JavaScript bindings
+- **Formal Verification**: hax/F\*, ProVerif support for cryptographic proofs
+- **Docker Support**: Fully containerized development environment
 
 ## Building
 
-### Prerequisites
+### Option 1: Using Docker (Recommended)
+
+No local tool installation required. All dependencies are containerized.
+
+```bash
+# Build WASM (production) -> ./pkg
+docker compose run build
+
+# Build WASM (dev) -> ./pkg
+docker compose run build-dev
+
+# Build WASM for Node.js -> ./pkg-node
+docker compose run build-node
+```
+
+### Option 2: Local Installation
+
+#### Prerequisites
 
 - Rust (install via [rustup](https://rustup.rs/))
 - wasm-pack (install via `npm run install-wasm-pack` or [wasm-pack installer](https://rustwasm.github.io/wasm-pack/installer/))
 - Node.js and npm
 
-### Build WASM
+#### Build WASM
 
 ```bash
 npm run build:wasm
@@ -35,7 +54,7 @@ npm run build:wasm
 
 This will compile the Rust code to WebAssembly and output files to the `pkg/` directory.
 
-### Build for Production
+#### Build for Production
 
 ```bash
 npm run build:wasm:production
@@ -105,7 +124,7 @@ await wasmInstance.initialize();
 // Initialize users
 const alice = await SignalWasmHelpers.initializeSignalUser(
   "Alice",
-  wasmInstance
+  wasmInstance,
 );
 const bob = await SignalWasmHelpers.initializeSignalUser("Bob", wasmInstance);
 
@@ -116,18 +135,18 @@ const bobBundle = await SignalWasmHelpers.getPublicKeyBundle(bob);
 const exchangeResult = await SignalWasmHelpers.performX3DHKeyExchange(
   alice,
   bobBundle,
-  wasmInstance
+  wasmInstance,
 );
 
 // Initialize Double Ratchet
 const wasmModule = await loadWasmModule();
 const aliceState = wasmModule.initialize_double_ratchet(
   exchangeResult.sharedSecret,
-  true // isInitiator
+  true, // isInitiator
 );
 const bobState = wasmModule.initialize_double_ratchet(
   exchangeResult.sharedSecret,
-  false // isInitiator
+  false, // isInitiator
 );
 
 // Encrypt and decrypt messages
@@ -158,6 +177,79 @@ signal-protocol/
 ## Module Federation
 
 This package is configured for module federation and can be consumed by other applications. The bootstrap entry point (`src/bootstrap.tsx`) is set up for federation.
+
+## Docker Commands
+
+All development can be done inside Docker containers without installing tools locally.
+
+```bash
+# Build WASM
+docker compose run build           # Production build -> ./pkg
+docker compose run build-dev       # Dev build -> ./pkg
+docker compose run build-node      # Node.js target -> ./pkg-node
+
+# Testing
+docker compose run test            # Run all tests
+docker compose run test-rust       # Rust tests only
+docker compose run test-wasm       # WASM tests only
+docker compose run test-jest       # Jest tests only
+
+# Development
+docker compose up dev              # Start Storybook (localhost:6006)
+docker compose up serve            # Serve production build (localhost:8084)
+docker compose run shell           # Interactive shell in dev container
+
+# Formal Verification
+docker compose run verification    # Extract F* from Rust code
+docker compose run hax-fstar       # Extract F* specifically
+docker compose run hax-coq         # Extract Coq specifically
+docker compose run hax-lean        # Extract Lean specifically
+docker compose run proverif        # Run all ProVerif proofs
+docker compose run proverif-x3dh   # Run X3DH proofs
+docker compose run proverif-double-ratchet  # Run Double Ratchet proofs
+docker compose run formal-shell    # Interactive shell with hax/F*/ProVerif
+```
+
+## Formal Verification
+
+This project supports formal verification using:
+
+- **hax**: Translates Rust to F\*, Coq, or Lean for formal proofs
+- **ProVerif**: Cryptographic protocol verifier for X3DH and Double Ratchet
+
+### Using hax
+
+```bash
+# Extract F* from signal-protocol-core
+docker compose run hax-fstar
+
+# Extract Coq
+docker compose run hax-coq
+
+# Extract Lean
+docker compose run hax-lean
+
+# Interactive shell with hax
+docker compose run formal-shell
+cargo hax into fstar --help
+```
+
+### Using ProVerif
+
+```bash
+# Run all ProVerif proofs
+docker compose run proverif
+
+# Run specific proofs
+docker compose run proverif-x3dh
+docker compose run proverif-double-ratchet
+
+# Interactive ProVerif shell
+docker compose run formal-shell
+proverif formal-proofs/proverif/x3dh/x3dh_complete.pv
+```
+
+See `formal-proofs/README.md` for more details on the ProVerif models.
 
 ## License
 

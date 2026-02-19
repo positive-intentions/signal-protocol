@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Cryptographic key pair structure
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyPair {
     pub public_key: Vec<u8>,
@@ -19,7 +18,6 @@ impl KeyPair {
     }
 }
 
-/// Result of X3DH key exchange protocol
 #[derive(Clone, Debug)]
 pub struct X3DHResult {
     pub shared_secret: Vec<u8>,
@@ -36,7 +34,6 @@ impl X3DHResult {
     }
 }
 
-/// Result of message encryption operation
 #[derive(Clone, Debug)]
 pub struct EncryptionResult {
     pub ciphertext: Vec<u8>,

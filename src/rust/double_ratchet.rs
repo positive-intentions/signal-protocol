@@ -2,13 +2,13 @@
 //!
 //! Thin WASM wrapper around signal-protocol-core.
 
-use wasm_bindgen::prelude::*;
-use js_sys::Uint8Array;
-#[cfg(target_arch = "wasm32")]
-use web_sys::console;
-use std::collections::HashMap;
 use crate::rust::crypto::uint8_array_to_vec;
 use crate::rust::types::KeyPair;
+use js_sys::Uint8Array;
+use std::collections::BTreeMap;
+use wasm_bindgen::prelude::*;
+#[cfg(target_arch = "wasm32")]
+use web_sys::console;
 
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
@@ -83,7 +83,7 @@ pub struct DoubleRatchetState {
     #[wasm_bindgen(skip)]
     pub previous_chain_length: u32,
     #[wasm_bindgen(skip)]
-    pub skipped_message_keys: HashMap<String, Vec<u8>>,
+    pub skipped_message_keys: BTreeMap<String, Vec<u8>>,
 }
 
 #[wasm_bindgen]
@@ -155,7 +155,10 @@ pub fn initialize_double_ratchet(
     shared_secret: &Uint8Array,
     is_initiator: bool,
 ) -> Result<DoubleRatchetState, JsValue> {
-    log(&format!("Initializing Double Ratchet (initiator: {})", is_initiator));
+    log(&format!(
+        "Initializing Double Ratchet (initiator: {})",
+        is_initiator
+    ));
     let shared_secret_bytes = uint8_array_to_vec(shared_secret);
     signal_protocol_core::initialize_double_ratchet_internal(&shared_secret_bytes, is_initiator)
         .map(core_to_wasm_state)
@@ -163,12 +166,16 @@ pub fn initialize_double_ratchet(
 }
 
 /// Derive a message key from a chain key - delegates to core (for tests)
-pub(crate) fn derive_message_key(chain_key: &[u8]) -> Result<Vec<u8>, crate::rust::error::SignalError> {
+pub(crate) fn derive_message_key(
+    chain_key: &[u8],
+) -> Result<Vec<u8>, crate::rust::error::SignalError> {
     signal_protocol_core::derive_message_key(chain_key)
 }
 
 /// Derive the next chain key - delegates to core (for tests)
-pub(crate) fn derive_next_chain_key(chain_key: &[u8]) -> Result<Vec<u8>, crate::rust::error::SignalError> {
+pub(crate) fn derive_next_chain_key(
+    chain_key: &[u8],
+) -> Result<Vec<u8>, crate::rust::error::SignalError> {
     signal_protocol_core::derive_next_chain_key(chain_key)
 }
 
@@ -177,11 +184,15 @@ pub fn double_ratchet_encrypt(
     state: &mut DoubleRatchetState,
     plaintext: &Uint8Array,
 ) -> Result<DoubleRatchetMessage, JsValue> {
-    log(&format!("Encrypting message #{}", state.sending_message_number));
+    log(&format!(
+        "Encrypting message #{}",
+        state.sending_message_number
+    ));
     let plaintext_bytes = uint8_array_to_vec(plaintext);
     let mut core_state = wasm_to_core_state(state);
-    let core_msg = signal_protocol_core::double_ratchet_encrypt_internal(&mut core_state, &plaintext_bytes)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let core_msg =
+        signal_protocol_core::double_ratchet_encrypt_internal(&mut core_state, &plaintext_bytes)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
     *state = core_to_wasm_state(core_state);
     Ok(DoubleRatchetMessage {
         ciphertext: core_msg.ciphertext,
@@ -204,20 +215,22 @@ pub fn double_ratchet_decrypt(
         previous_chain_length: message.previous_chain_length,
     };
     let mut core_state = wasm_to_core_state(state);
-    let plaintext = signal_protocol_core::double_ratchet_decrypt_internal(&mut core_state, &core_msg)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let plaintext =
+        signal_protocol_core::double_ratchet_decrypt_internal(&mut core_state, &core_msg)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
     *state = core_to_wasm_state(core_state);
     Ok(Uint8Array::from(&plaintext[..]))
 }
 
 #[wasm_bindgen]
-pub fn cleanup_skipped_message_keys(
-    state: &mut DoubleRatchetState,
-    max_keys: usize,
-) -> usize {
-    log(&format!("Cleaning up skipped message keys (max: {})", max_keys));
+pub fn cleanup_skipped_message_keys(state: &mut DoubleRatchetState, max_keys: usize) -> usize {
+    log(&format!(
+        "Cleaning up skipped message keys (max: {})",
+        max_keys
+    ));
     let mut core_state = wasm_to_core_state(state);
-    let removed = signal_protocol_core::cleanup_skipped_message_keys_internal(&mut core_state, max_keys);
+    let removed =
+        signal_protocol_core::cleanup_skipped_message_keys_internal(&mut core_state, max_keys);
     *state = core_to_wasm_state(core_state);
     removed
 }
@@ -250,7 +263,8 @@ pub(crate) fn cleanup_skipped_message_keys_internal(
     max_keys: usize,
 ) -> usize {
     let mut core_state = wasm_to_core_state(state);
-    let removed = signal_protocol_core::cleanup_skipped_message_keys_internal(&mut core_state, max_keys);
+    let removed =
+        signal_protocol_core::cleanup_skipped_message_keys_internal(&mut core_state, max_keys);
     *state = core_to_wasm_state(core_state);
     removed
 }
@@ -270,7 +284,8 @@ pub(crate) fn double_ratchet_encrypt_internal(
     plaintext: &[u8],
 ) -> Result<DoubleRatchetMessage, crate::rust::error::SignalError> {
     let mut core_state = wasm_to_core_state(state);
-    let core_msg = signal_protocol_core::double_ratchet_encrypt_internal(&mut core_state, plaintext)?;
+    let core_msg =
+        signal_protocol_core::double_ratchet_encrypt_internal(&mut core_state, plaintext)?;
     *state = core_to_wasm_state(core_state);
     Ok(DoubleRatchetMessage {
         ciphertext: core_msg.ciphertext,
@@ -292,7 +307,8 @@ pub(crate) fn double_ratchet_decrypt_internal(
         previous_chain_length: message.previous_chain_length,
     };
     let mut core_state = wasm_to_core_state(state);
-    let plaintext = signal_protocol_core::double_ratchet_decrypt_internal(&mut core_state, &core_msg)?;
+    let plaintext =
+        signal_protocol_core::double_ratchet_decrypt_internal(&mut core_state, &core_msg)?;
     *state = core_to_wasm_state(core_state);
     Ok(plaintext)
 }
@@ -303,8 +319,8 @@ mod tests {
     use super::*;
     use wasm_bindgen_test::*;
     wasm_bindgen_test_configure!(run_in_browser);
-    use crate::rust::x3dh::x3dh_initiate;
     use crate::rust::keys::*;
+    use crate::rust::x3dh::x3dh_initiate;
 
     #[wasm_bindgen_test]
     fn test_double_ratchet_initialization() {
@@ -387,7 +403,10 @@ mod tests {
         let plaintext = Uint8Array::from("Secret message".as_bytes());
         let encrypted_message = double_ratchet_encrypt(&mut alice_state, &plaintext).unwrap();
         let decrypted = double_ratchet_decrypt(&mut bob_state, &encrypted_message).unwrap();
-        assert_eq!(String::from_utf8(decrypted.to_vec()).unwrap(), "Secret message");
+        assert_eq!(
+            String::from_utf8(decrypted.to_vec()).unwrap(),
+            "Secret message"
+        );
         let ciphertext = encrypted_message.ciphertext().to_vec();
         assert!(ciphertext.len() >= 12 + 16);
     }
@@ -437,9 +456,15 @@ mod tests {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
         let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
         let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
-        let msg1 = double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 1".as_bytes())).unwrap();
-        let msg2 = double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 2".as_bytes())).unwrap();
-        let msg3 = double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 3".as_bytes())).unwrap();
+        let msg1 =
+            double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 1".as_bytes()))
+                .unwrap();
+        let msg2 =
+            double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 2".as_bytes()))
+                .unwrap();
+        let msg3 =
+            double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 3".as_bytes()))
+                .unwrap();
         let decrypted3 = double_ratchet_decrypt(&mut bob_state, &msg3).unwrap();
         assert_eq!(String::from_utf8(decrypted3.to_vec()).unwrap(), "Message 3");
         let decrypted1 = double_ratchet_decrypt(&mut bob_state, &msg1).unwrap();
@@ -490,8 +515,9 @@ mod tests {
             &alice_ephemeral.private_key(),
             &bob_identity.public_key(),
             &bob_signed_prekey.public_key(),
-            None
-        ).unwrap();
+            None,
+        )
+        .unwrap();
         let shared_secret = x3dh_result.shared_secret();
         let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
         let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();

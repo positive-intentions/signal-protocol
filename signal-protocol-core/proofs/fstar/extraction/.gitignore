@@ -1,0 +1,11 @@
+# Generated/extracted files (ignore these)
+Signal_protocol_core*.fst
+Signal_protocol_core*.fsti
+.cache/
+.hints/
+.depend
+*.checked
+*.hints
+
+# But keep hand-written verification modules
+!AbstractCrypto.fst

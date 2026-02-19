@@ -9,28 +9,25 @@ license = "MIT OR Apache-2.0"
 crate-type = ["lib"]
 
 [dependencies]
-# Cryptography
-x25519-dalek = { version = "2.0", features = ["static_secrets"] }
-ed25519-dalek = { version = "2.0", features = ["rand_core"] }
+x25519-dalek = { version = "2.0", features = ["static_secrets"], optional = true }
+ed25519-dalek = { version = "2.0", features = ["rand_core"], optional = true }
 sha2 = "0.10"
 hkdf = "0.12"
-aes-gcm = "0.10"
-rand = "0.8"
+aes-gcm = { version = "0.10", optional = true }
+rand = { version = "0.8", optional = true }
 rand_core = "0.6"
 
-# Error handling
 thiserror = "1.0"
 
-# Hex encoding (for non-sensitive data only)
 hex = "0.4"
 
-# Serialization
 serde = { version = "1.0", features = ["derive"] }
 
-# hax formal verification - enable with: cargo build -p signal-protocol-core --features hax
-# Then run: cargo hax into -i '-** +signal_protocol_core::double_ratchet::derive_message_key' fstar
-hax-lib = { git = "https://github.com/hacspec/hax", optional = true }
+hax-lib = "0.3"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(hax_compilation)"] }
 
 [features]
-default = []
-hax = ["dep:hax-lib"]
+default = ["crypto-backend"]
+crypto-backend = ["dep:x25519-dalek", "dep:ed25519-dalek", "dep:aes-gcm", "dep:rand"]
