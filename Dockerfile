@@ -135,9 +135,9 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
     rustup default nightly-2025-02-01 && \
     rustc --version && cargo --version
 
-# Install F*, Z3, and ProVerif via OPAM
+# Install F*, Rocq, Z3, and ProVerif via OPAM
 RUN eval $(opam env) && \
-    opam install -y --no-depexts z3 fstar proverif
+    opam install -y --no-depexts z3 fstar rocq-prover proverif
 
 # Install hax from git
 RUN eval $(opam env) && \

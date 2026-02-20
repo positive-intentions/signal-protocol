@@ -1,0 +1,31 @@
+# Rocq extraction directory
+
+# Generated Rocq files
+Signal_protocol_core*.v
+Signal_protocol_core*.vo
+Signal_protocol_core*.v.d
+Signal_protocol_core*.glob
+
+# Rocq Make files
+_CoqProject
+Makefile.coq
+Makefile.conf
+
+# Rocq cache / hints / hints.log
+.hints/
+.cache/
+*.hints
+*.log
+
+# Backups
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+.*.aux
+*.aux
+*.cmi
+*.cmo

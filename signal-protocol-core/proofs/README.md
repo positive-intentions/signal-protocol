@@ -1,6 +1,6 @@
-# Signal Protocol Core - F\* Verification
+# Signal Protocol Core - Formal Verification
 
-This directory contains the F\* formal verification setup for the Signal Protocol core implementation.
+This directory contains formal verification setups for the Signal Protocol core implementation using F\*, Rocq (formerly Coq), and ProVerif.
 
 ## Prerequisites
 
@@ -170,3 +170,105 @@ make
 - [F\* documentation](https://www.fstar-lang.org)
 - [Signal Protocol specification](https://signal.org/docs/)
 - [ProVerif proofs](../../formal-proofs/proverif/) - Existing ProVerif security proofs
+
+---
+
+## Rocq Verification
+
+**Note**: Rocq is the successor to Coq (renamed March 2025). Rocq uses `.v` files and provides a mature, well-documented theorem proving environment.
+
+### Prerequisites
+
+Install Rocq via OPAM:
+
+```bash
+opam install rocq-prover
+```
+
+### Extracting Rocq from Rust
+
+**Important**: Rocq extraction must be done WITHOUT the `crypto-backend` feature to get abstract crypto primitives.
+
+```bash
+cd signal-protocol-core
+cargo-hax -C --no-default-features \; into coq --z3rlimit 40
+```
+
+### Verifying Rocq Code
+
+```bash
+cd proofs/rocq/extraction
+make verify              # Verify all modules
+make verify-lite         # Verify core modules only (Crypto, Keys, Error, Types, X3dh)
+make                    # Extract and verify everything
+```
+
+### Docker Commands
+
+```bash
+# Extract Rocq from Rust
+docker compose run hax-rocq
+
+# Verify all Rocq files
+docker compose run rocq-verify
+
+# Interactive Rocq shell
+docker compose run rocq-shell
+```
+
+### Rocq Project Structure
+
+```
+proofs/rocq/extraction/
+├── AbstractCrypto.v          # Hand-written abstract crypto module
+├── Makefile                  # Build configuration
+├── hax.coq.config.json       # Rocq configuration for hax
+└── Signal_protocol_core*.v   # Extracted Rocq files
+```
+
+### Abstract Crypto Module (Rocq Version)
+
+The `AbstractCrypto.v` module provides abstract models of cryptographic operations:
+
+- **Key Operations**: `generate_private_key`, `public_key_of_private`
+- **Diffie-Hellman**: `dh` - X25519 key exchange
+- **Signatures**: `sign`, `verify` - Ed25519 signatures
+- **Key Derivation**: `hkdf_derive` - HKDF key derivation
+- **Encryption**: `aead_encrypt`, `aead_decrypt` - AEAD encryption
+
+### Security Axioms in Rocq
+
+The module includes Coq/Rocq-style axioms for:
+
+- **Key Generation**: Valid keys, public key derivation
+- **DH Security**: Commutativity, determinism, correctness
+- **Signature Security**: Correctness, unforgeability
+- **Key Properties**: Injectivity, inverse, forward secrecy
+- **HKDF/AEAD**: Output length, determinism, round-trip
+
+### Comparison: F\* vs Rocq
+
+| Aspect         | F\*                                      | Rocq                                                      |
+| -------------- | ---------------------------------------- | --------------------------------------------------------- |
+| File Extension | `.fst`                                   | `.v`                                                      |
+| Command        | `fstar.exe`                              | `rocq`                                                    |
+| Compilation    | `--cache_checked_modules`                | `rocq make -j`                                            |
+| Proof Style    | SMT/Z3 automated (with refinement types) | Tactic-based (LEMM, apply, induction)                     |
+| Community      | Crypto-focused, smaller                  | Very large, mature (CompCert, Mathematical formalization) |
+| Learning Curve | Steep                                    | Moderate                                                  |
+
+### Rocq Documentation
+
+See [proofs/rocq/README.md](rocq/README.md) for detailed Rocq verification setup including:
+
+- Complete setup instructions
+- Common issues and solutions
+- Migration guide from Coq
+- Interactive development workflow
+- Detailed security properties
+
+References:
+
+- [Rocq Prover documentation](https://rocq-prover.org)
+- [ROCQ / Coq migration guide](https://rocq-prover.org)
+- [hax Rocq backend](https://hax.cryspen.com)

@@ -214,7 +214,7 @@ docker compose run formal-shell    # Interactive shell with hax/F*/ProVerif
 
 This project supports formal verification using:
 
-- **hax**: Translates Rust to F\*, Coq, or Lean for formal proofs
+- **hax**: Translates Rust to F\*, Rocq (Coq), or Lean for formal proofs
 - **ProVerif**: Cryptographic protocol verifier for X3DH and Double Ratchet
 
 ### Using hax
@@ -223,8 +223,8 @@ This project supports formal verification using:
 # Extract F* from signal-protocol-core
 docker compose run hax-fstar
 
-# Extract Coq
-docker compose run hax-coq
+# Extract Rocq (Coq) from signal-protocol-core
+docker compose run hax-rocq
 
 # Extract Lean
 docker compose run hax-lean
@@ -234,7 +234,23 @@ docker compose run formal-shell
 cargo hax into fstar --help
 ```
 
-### Using ProVerif
+### Using Rocq Verification
+
+```bash
+# Extract Rocq from Rust code
+docker compose run hax-rocq
+
+# Verify all Rocq files
+docker compose run rocq-verify
+
+# Interactive Rocq shell
+docker compose run rocq-shell
+# Inside shell:
+cd signal-protocol-core/proofs/rocq/extraction
+make verify    # Verify all modules
+make verify-lite  # Verify core modules only
+make extract   # Extract only (no verification)
+```
 
 ```bash
 # Run all ProVerif proofs
