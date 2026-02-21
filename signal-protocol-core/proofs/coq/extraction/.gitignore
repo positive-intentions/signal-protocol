@@ -1,0 +1,43 @@
+# Rocq/Coq extraction directory
+
+# Hand-written files to keep (NOT ignored):
+# - AbstractCrypto.v
+# - Makefile
+# - hax.coq.config.json
+# - README.md
+# - .gitignore
+
+# Extracted Rocq files from hax (generated, do not commit)
+Signal_protocol_core*.v
+Signal_protocol_core*.v.map
+
+# Compiled Rocq/Coq files
+*.vo
+*.glob
+*.vok
+*.vos
+*.v.d
+
+# Rocq/Coq Make files
+_CoqProject
+Makefile.coq
+Makefile.conf
+
+# Rocq cache / hints
+.hints/
+.cache/
+*.hints
+*.log
+
+# Backups
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+.*.aux
+*.aux
+*.cmi
+*.cmo

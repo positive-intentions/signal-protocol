@@ -1,8 +1,10 @@
 //! Core data types for Signal Protocol (no WASM)
 
+#[cfg(not(hax_compilation))]
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(not(hax_compilation), derive(Serialize, Deserialize))]
 pub struct KeyPair {
     pub public_key: Vec<u8>,
     pub private_key: Vec<u8>,
