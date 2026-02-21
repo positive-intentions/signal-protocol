@@ -28,6 +28,7 @@ module.exports = {
     "/node_modules/",
     "/Frontend/",
     "/hax/",
+    "/hax-upstream/",
     "src/tests/mls-protocol.test.js", // Requires ts-mls ES modules
     "src/tests/signal-protocol-javascript.test.js", // Missing Cryptography component - TODO: fix or create component
     "src/tests/wasm-wrappers-coverage.test.js", // WASM tests - use 'npm run test:wasm:wrappers' instead

@@ -25,7 +25,7 @@ eval("{__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpa
   \******************************************/
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-eval("{module.exports = __webpack_require__.p + \"70631c1c7fbd18e646c5.wasm\";\n\n//# sourceURL=webpack://signal-protocol/./pkg/signal_protocol_wasm_bg.wasm?\n}");
+eval("{module.exports = __webpack_require__.p + \"ef363d8dd5fa7be47a14.wasm\";\n\n//# sourceURL=webpack://signal-protocol/./pkg/signal_protocol_wasm_bg.wasm?\n}");
 
 /***/ }),
 
