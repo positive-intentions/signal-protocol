@@ -36,13 +36,17 @@ describe("WASM Wrapper Functions Coverage", () => {
     try {
       // Try loading WASM module - use nodejs build if available for better Node.js compatibility
       const pkgNodeDir = path.join(process.cwd(), "pkg-node");
-      const wasmPath = fs.existsSync(path.join(pkgNodeDir, "signal_protocol_wasm.js"))
+      const wasmPath = fs.existsSync(
+        path.join(pkgNodeDir, "signal_protocol_wasm.js"),
+      )
         ? path.join(pkgNodeDir, "signal_protocol_wasm.js")
         : path.join(pkgDir, "signal_protocol_wasm.js");
-      
-      const WasmModule = await import(pathToFileURL(path.resolve(wasmPath)).href);
+
+      const WasmModule = await import(
+        pathToFileURL(path.resolve(wasmPath)).href
+      );
       // Node.js build doesn't need default() call, web build does
-      if (typeof WasmModule.default === 'function') {
+      if (typeof WasmModule.default === "function") {
         await WasmModule.default();
       }
       wasmModule = WasmModule;
@@ -52,10 +56,17 @@ describe("WASM Wrapper Functions Coverage", () => {
       // Jest has known limitations importing ES modules from pkg directory
       // The error message will indicate this is a Jest/ESM compatibility issue
       console.error(`❌ Failed to load WASM module: ${error.message}`);
-      if (error.message.includes("Must use import") || error.message.includes("Unexpected token")) {
+      if (
+        error.message.includes("Must use import") ||
+        error.message.includes("Unexpected token")
+      ) {
         console.error("💡 This is a known Jest limitation with ES modules.");
-        console.error("💡 Consider using 'wasm-pack test --node' for WASM-specific tests.");
-        console.error("💡 Or run tests in a browser environment using 'wasm-pack test --chrome'");
+        console.error(
+          "💡 Consider using 'wasm-pack test --node' for WASM-specific tests.",
+        );
+        console.error(
+          "💡 Or run tests in a browser environment using 'wasm-pack test --chrome'",
+        );
       }
       wasmAvailable = false;
       // Don't throw here - let individual tests fail with clear messages
@@ -456,12 +467,7 @@ describe("WASM Wrapper Functions Coverage", () => {
       const info = new TextEncoder().encode("info");
 
       for (const length of [16, 32, 64]) {
-        const result = wasmModule.hkdf_derive_key(
-          inputKey,
-          salt,
-          info,
-          length,
-        );
+        const result = wasmModule.hkdf_derive_key(inputKey, salt, info, length);
         expect(result.length).toBe(length);
       }
     });
@@ -692,4 +698,3 @@ describe("WASM Wrapper Functions Coverage", () => {
     });
   });
 });
-
