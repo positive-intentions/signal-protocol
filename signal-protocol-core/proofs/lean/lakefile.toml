@@ -1,0 +1,11 @@
+name = "SignalProtocolCore"
+version = "0.1.0"
+defaultTargets = ["SignalProtocolCore"]
+
+[[lean_lib]]
+name = "SignalProtocolCore"
+roots = ["extraction.signal_protocol_core", "extraction.AbstractCrypto"]
+
+[[require]]
+name = "Hax"
+path = "../../../hax-upstream/hax-lib/proof-libs/lean"

@@ -18,7 +18,7 @@ This repository contains a complete implementation of the Signal Protocol crypto
 - **TypeScript/JavaScript Bindings**: Easy-to-use JavaScript API
 - **Storybook Demos**: Interactive browser-based demonstrations of all functionality
 - **Comprehensive Tests**: Unit tests for Rust, WASM, and JavaScript bindings
-- **Formal Verification**: hax/F\*, ProVerif support for cryptographic proofs
+- **Formal Verification**: hax/F\*, Rocq, Lean support for cryptographic proofs
 - **Docker Support**: Fully containerized development environment
 
 ## Building
@@ -199,15 +199,18 @@ docker compose up dev              # Start Storybook (localhost:6006)
 docker compose up serve            # Serve production build (localhost:8084)
 docker compose run shell           # Interactive shell in dev container
 
-# Formal Verification
-docker compose run verification    # Extract F* from Rust code
-docker compose run hax-fstar       # Extract F* specifically
-docker compose run hax-coq         # Extract Coq specifically
-docker compose run hax-lean        # Extract Lean specifically
-docker compose run proverif        # Run all ProVerif proofs
-docker compose run proverif-x3dh   # Run X3DH proofs
-docker compose run proverif-double-ratchet  # Run Double Ratchet proofs
-docker compose run formal-shell    # Interactive shell with hax/F*/ProVerif
+  # Formal Verification
+  docker compose run verification    # Extract F* from Rust code
+  docker compose run hax-fstar       # Extract F* specifically
+  docker compose run hax-coq         # Extract Coq specifically
+  docker compose run hax-lean        # Extract Lean specifically
+  docker compose run proverif        # Run all ProVerif proofs
+  docker compose run proverif-x3dh   # Run X3DH proofs
+  docker compose run proverif-double-ratchet  # Run Double Ratchet proofs
+  docker compose run formal-shell    # Interactive shell with hax/F*/ProVerif
+  docker compose run coq-verify      # Verify all Rocq files
+  docker compose run lean-verify     # Verify all Lean files
+  docker compose run lean-shell      # Interactive Lean shell
 ```
 
 ## Formal Verification
@@ -238,35 +241,60 @@ cargo hax into fstar --help
 
 ```bash
 # Extract Rocq from Rust code
-docker compose run hax-rocq
+docker compose run hax-coq
 
 # Verify all Rocq files
-docker compose run rocq-verify
+docker compose run coq-verify
 
 # Interactive Rocq shell
-docker compose run rocq-shell
+docker compose run coq-shell
 # Inside shell:
-cd signal-protocol-core/proofs/rocq/extraction
+cd signal-protocol-core/proofs/coq/extraction
 make verify    # Verify all modules
 make verify-lite  # Verify core modules only
 make extract   # Extract only (no verification)
 ```
 
+### Using Lean Verification
+
 ```bash
+# Extract Lean from Rust code
+docker compose run hax-lean
+
+# Verify all Lean files
+docker compose run lean-verify
+
+# Interactive Lean shell
+docker compose run lean-shell
+# Inside shell:
+cd signal-protocol-core/proofs/lean
+lake build              # Build all Lean files
+lake build <module>     # Build specific module
+```
+
+### Using ProVerif
+
 # Run all ProVerif proofs
+
 docker compose run proverif
 
 # Run specific proofs
+
 docker compose run proverif-x3dh
 docker compose run proverif-double-ratchet
 
 # Interactive ProVerif shell
+
 docker compose run formal-shell
 proverif formal-proofs/proverif/x3dh/x3dh_complete.pv
+
 ```
 
 See `formal-proofs/README.md` for more details on the ProVerif models.
 
+See `signal-protocol-core/proofs/README.md` for detailed setup of F\*, Rocq, and Lean verification.
+
 ## License
 
 ISC
+```
