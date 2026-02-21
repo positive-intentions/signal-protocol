@@ -139,6 +139,13 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 RUN eval $(opam env) && \
     opam install -y --no-depexts z3 fstar rocq-prover proverif
 
+# Install Lean via elan
+ENV ELAN_HOME=/root/.elan \
+    PATH=/root/.elan/bin:${PATH}
+RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.28.0-rc1 && \
+    elan toolchain list && \
+    lean --version
+
 # Install hax from git
 RUN eval $(opam env) && \
     git clone https://github.com/hacspec/hax.git /tmp/hax && \
