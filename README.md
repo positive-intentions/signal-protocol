@@ -1,8 +1,12 @@
 # Signal Protocol
 
-[![Lint](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/lint.yml?branch=staging)](https://github.com/positive-intentions/signal-protocol/actions/workflows/lint.yml)
-[![Test](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test.yml?branch=staging)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test.yml)
-[![Build](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/build.yml?branch=staging)](https://github.com/positive-intentions/signal-protocol/actions/workflows/build.yml)
+![Signal Protocol](signal.png)
+
+> **Disclaimer:** This project has not been audited or security-reviewed. It is provided for open source transparency and educational purposes. Use at your own risk.
+
+[![Lint](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/lint.yml?branch=staging&label=Lint)](https://github.com/positive-intentions/signal-protocol/actions/workflows/lint.yml)
+[![Test](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test.yml?branch=staging&label=Test)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/build.yml?branch=staging&label=Build)](https://github.com/positive-intentions/signal-protocol/actions/workflows/build.yml)
 
 A Rust implementation of the Signal Protocol compiled to WebAssembly (WASM) for use in web browsers and Node.js environments.
 
