@@ -175,7 +175,7 @@ make
 
 ## Rocq Verification
 
-**Note**: Rocq is the successor to Coq (renamed March 2025). Rocq uses `.v` files and provides a mature, well-documented theorem proving environment.
+**Note**: Rocq is the successor to Coq (renamed March 2025). Rocq uses `.v` files and provides a mature, well-documented theorem proving environment. The hax backend outputs to `proofs/coq/` which is compatible with both Coq and Rocq.
 
 ### Prerequisites
 
@@ -191,13 +191,13 @@ opam install rocq-prover
 
 ```bash
 cd signal-protocol-core
-cargo-hax -C --no-default-features \; into coq --z3rlimit 40
+cargo-hax -C --no-default-features \; into coq
 ```
 
 ### Verifying Rocq Code
 
 ```bash
-cd proofs/rocq/extraction
+cd proofs/coq/extraction
 make verify              # Verify all modules
 make verify-lite         # Verify core modules only (Crypto, Keys, Error, Types, X3dh)
 make                    # Extract and verify everything
@@ -207,19 +207,19 @@ make                    # Extract and verify everything
 
 ```bash
 # Extract Rocq from Rust
-docker compose run hax-rocq
+docker compose run hax-coq
 
 # Verify all Rocq files
-docker compose run rocq-verify
+docker compose run coq-verify
 
 # Interactive Rocq shell
-docker compose run rocq-shell
+docker compose run coq-shell
 ```
 
 ### Rocq Project Structure
 
 ```
-proofs/rocq/extraction/
+proofs/coq/extraction/
 ├── AbstractCrypto.v          # Hand-written abstract crypto module
 ├── Makefile                  # Build configuration
 ├── hax.coq.config.json       # Rocq configuration for hax
@@ -259,7 +259,7 @@ The module includes Coq/Rocq-style axioms for:
 
 ### Rocq Documentation
 
-See [proofs/rocq/README.md](rocq/README.md) for detailed Rocq verification setup including:
+See [proofs/coq/README.md](coq/README.md) for detailed Rocq verification setup including:
 
 - Complete setup instructions
 - Common issues and solutions

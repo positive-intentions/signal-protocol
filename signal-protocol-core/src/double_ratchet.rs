@@ -145,15 +145,17 @@ pub fn skip_message_keys(
 
     let mut current_chain_key = receiving_chain_key;
 
-    while state.receiving_message_number < until_message_number {
+    // Use for loop instead of while - HAX cannot functionalize while loops (issues #15, #933).
+    // skip_count is bounded by MAX_SKIPPED_MESSAGE_KEYS, so this is safe.
+    for i in 0..skip_count {
         let message_key = derive_message_key(&current_chain_key)?;
-        let key_id = format!("{}:{}", dh_public_key_hex, state.receiving_message_number);
+        let message_number = state.receiving_message_number + i;
+        let key_id = format!("{}:{}", dh_public_key_hex, message_number);
         state.skipped_message_keys.insert(key_id, message_key);
 
         current_chain_key = derive_next_chain_key(&current_chain_key)?;
-        state.receiving_message_number += 1;
     }
-
+    state.receiving_message_number = until_message_number;
     state.receiving_chain_key = Some(current_chain_key);
 
     Ok(())

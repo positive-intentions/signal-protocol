@@ -175,19 +175,7 @@ services:
     stdin_open: true
     tty: true
 
-  hax-rocq:
-    build:
-      context: .
-      target: verification
-    volumes:
-      - ./signal-protocol-core:/app/signal-protocol-core
-      - ./formal-proofs:/app/formal-proofs
-    environment:
-      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    working_dir: /app/signal-protocol-core
-    command: cargo hax into coq
-
-  rocq-shell:
+  coq-shell:
     build:
       context: .
       target: verification
@@ -199,7 +187,7 @@ services:
     stdin_open: true
     tty: true
 
-  rocq-verify:
+  coq-verify:
     build:
       context: .
       target: verification
@@ -207,5 +195,5 @@ services:
       - ./signal-protocol-core:/app/signal-protocol-core
     environment:
       - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    working_dir: /app/signal-protocol-core/proofs/rocq/extraction
+    working_dir: /app/signal-protocol-core/proofs/coq/extraction
     command: make verify

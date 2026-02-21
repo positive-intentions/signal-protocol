@@ -13,16 +13,16 @@ cd signal-protocol-core
 cargo-hax -C --no-default-features \; into coq
 
 # Verify extracted files
-cd proofs/rocq/extraction
+cd proofs/coq/extraction
 make verify
 ```
 
 ## Docker
 
 ```bash
-docker compose run hax-rocq      # Extract Rocq
-docker compose run rocq-verify    # Verify Rocq files
-docker compose run rocq-shell     # Interactive shell
+docker compose run hax-coq      # Extract Rocq
+docker compose run coq-verify   # Verify Rocq files
+docker compose run coq-shell    # Interactive shell
 ```
 
 ## Documentation

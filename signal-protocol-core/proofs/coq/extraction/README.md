@@ -43,22 +43,22 @@ cd signal-protocol-core
 
 # Extract Rocq code without crypto backend (uses abstract crypto primitives)
 # Note: Make sure to run `eval $(opam env)` first to have hax-engine in PATH
-cargo-hax -C --no-default-features \; into coq --z3rlimit 40
+cargo-hax -C --no-default-features \; into coq
 ```
 
-This will generate Rocq files in `proofs/rocq/extraction/`.
+This will generate Rocq files in `proofs/coq/extraction/`.
 
 ### Alternative: Using Docker
 
 ```bash
-docker compose run hax-rocq      # Extract Rocq
-docker compose run rocq-verify    # Verify Rocq files
+docker compose run hax-coq      # Extract Rocq
+docker compose run coq-verify   # Verify Rocq files
 ```
 
 ## Verifying the Rocq Code
 
 ```bash
-cd proofs/rocq/extraction
+cd proofs/coq/extraction
 
 # Verify all Rocq files (AbstractCrypto.v + extracted modules)
 make verify
@@ -73,10 +73,10 @@ make
 ### Interactive Rocq Development
 
 ```bash
-docker compose run rocq-shell
+docker compose run coq-shell
 
 # Inside the shell
-cd signal-protocol-core/proofs/rocq/extraction
+cd signal-protocol-core/proofs/coq/extraction
 
 # Run rocq in interactive mode
 rocq AbstractCrypto.v
@@ -98,7 +98,7 @@ signal-protocol-core/
 │   ├── types.rs         # Core data types
 │   └── error.rs         # Error types
 └── proofs/
-    └── rocq/
+    └── coq/
         └── extraction/
             ├── AbstractCrypto.v      # Hand-written abstract crypto module
             ├── Makefile              # Build configuration
@@ -232,10 +232,10 @@ cat _CoqProject
 Using the Docker setup (recommended):
 
 ```bash
-docker compose run rocq-shell
+docker compose run coq-shell
 
 # Then inside the container
-cd signal-protocol-core/proofs/rocq/extraction
+cd signal-protocol-core/proofs/coq/extraction
 make verify
 ```
 
