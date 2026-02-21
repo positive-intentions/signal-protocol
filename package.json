@@ -6,6 +6,7 @@
     "start": "storybook dev -p 6006",
     "start:webpack": "webpack serve",
     "lint": "npm run lint:prettier && npm run lint:eslint",
+    "lint:ci": "prettier --check ./src/**/*.{js,jsx,ts,tsx} && eslint ./src/**/*.{js,jsx,ts,tsx}",
     "lint:prettier": "prettier --write ./src/**/*.{js,jsx,ts,tsx}",
     "lint:eslint": "eslint --fix ./src/**/*.{js,jsx,ts,tsx}",
     "test": "echo '🧪 Running all tests...' && npm run test:rust && npm run test:jest && npm run test:wasm:wrappers && echo '✅ All tests passed!'",

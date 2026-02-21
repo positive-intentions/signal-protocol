@@ -1,5 +1,7 @@
 # Signal Protocol
 
+[![CI](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/ci.yml?branch=staging)](https://github.com/positive-intentions/signal-protocol/actions/workflows/ci.yml)
+
 A Rust implementation of the Signal Protocol compiled to WebAssembly (WASM) for use in web browsers and Node.js environments.
 
 ## Overview
