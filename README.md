@@ -1,9 +1,7 @@
 # Signal Protocol
 
 <div align="center">
-
 <img src="signal.png" alt="App Logo" />
-
 </div>
 
 
