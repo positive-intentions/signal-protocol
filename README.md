@@ -1,6 +1,11 @@
 # Signal Protocol
 
-![Signal Protocol](signal.png)
+<div align="center">
+
+<img src="signal.png" alt="App Logo" />
+
+</div>
+
 
 <div align="center">
   
