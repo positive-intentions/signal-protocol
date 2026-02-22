@@ -2,11 +2,20 @@
 
 ![Signal Protocol](signal.png)
 
-> **Disclaimer:** This project has not been audited or security-reviewed. It is provided for open source transparency and educational purposes. Use at your own risk.
+<div align="center">
+  
+[Demo](https://signal.positive-intentions.com) | [Docs](https://positive-intentions.com/docs/technical/p2p-signal-protocol/) | [Audit](https://positive-intentions.com/docs/research/Security%20audit/signal-protocol-security-audit/) | [Formal Proof](https://positive-intentions.com/docs/technical/signal-protocol-formal-verification/) | [Reddit](https://www.reddit.com/r/positive_intentions) | <a rel="me" href="https://infosec.exchange/@xoron">Mastodon</a>
+</div>
+
+<div align="center">
 
 [![Lint](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/lint.yml?branch=staging&label=Lint)](https://github.com/positive-intentions/signal-protocol/actions/workflows/lint.yml)
 [![Test](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test.yml?branch=staging&label=Test)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test.yml)
 [![Build](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/build.yml?branch=staging&label=Build)](https://github.com/positive-intentions/signal-protocol/actions/workflows/build.yml)
+</div>
+
+
+> **Warning:** This project has not been audited or security-reviewed. It is open source for transparency and educational purposes. Use at your own risk.
 
 A Rust implementation of the Signal Protocol compiled to WebAssembly (WASM) for use in web browsers and Node.js environments.
 
@@ -306,3 +315,13 @@ See `signal-protocol-core/proofs/README.md` for detailed setup of F\*, Rocq, and
 
 ISC
 ```
+
+## Star History
+
+<a href="https://star-history.com/#positive-intentions/signal-protocol&Timeline">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=positive-intentions/signal-protocol&type=Timeline&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=positive-intentions/signal-protocol&type=Timeline" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=positive-intentions/signal-protocol&type=Timeline" />
+ </picture>
+</a>
