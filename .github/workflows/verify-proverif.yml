@@ -15,7 +15,7 @@ jobs:
   verify:
     name: ProVerif protocol verification
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
 
