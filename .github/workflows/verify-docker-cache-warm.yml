@@ -1,0 +1,57 @@
+# Manual run: build verification Docker targets with Buildx and export layers to
+# the shared GitHub Actions cache (`scope=verify`). Use a fast or self-hosted
+# runner from "Run workflow" to populate cache; regular verify-* jobs on
+# ubuntu-latest can then restore those layers via cache-from.
+name: Verify Docker cache (warm)
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner label (default: org larger runner linux_64_core)"
+        required: true
+        default: linux_64_core
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: verify-docker-cache-warm
+  cancel-in-progress: false
+
+jobs:
+  warm:
+    name: Warm GHA Docker cache
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Same scope as verify-fstar / verify-rocq / verify-lean
+      - name: Build verification target (populate cache)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          target: verification
+          push: false
+          outputs: type=cacheonly
+          cache-from: type=gha,scope=verify
+          cache-to: type=gha,mode=max,scope=verify
+
+      # Same scope as verify-proverif (shares base layers with verification)
+      - name: Build proverif target (populate cache)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          target: proverif
+          push: false
+          outputs: type=cacheonly
+          cache-from: type=gha,scope=verify
+          cache-to: type=gha,mode=max,scope=verify
