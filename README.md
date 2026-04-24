@@ -72,7 +72,7 @@ docker compose run build-node
 #### Prerequisites
 
 - Rust (install via [rustup](https://rustup.rs/))
-- wasm-pack (install via `npm run install-wasm-pack` or [wasm-pack installer](https://rustwasm.github.io/wasm-pack/installer/))
+- wasm-pack (install via `npm run install-wasm-pack` or [wasm-pack from npm](https://www.npmjs.com/package/wasm-pack))
 - Node.js and npm
 
 #### Build WASM
