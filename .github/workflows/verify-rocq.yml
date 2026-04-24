@@ -14,7 +14,7 @@ concurrency:
 jobs:
   verify:
     name: Rocq (Coq) formal verification
-    runs-on: ubuntu-latest
+    runs-on: linux_64_core
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
