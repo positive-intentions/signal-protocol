@@ -1687,6 +1687,113 @@ mod native_tests {
         assert_eq!(dec3, b"Alice to Bob again");
     }
 
+    // Signal Double Ratchet root_key invariants (native regression).
+    //
+    // Per the spec, DHRatchet() performs TWO KDF_RK calls per receive:
+    //   state.RK, state.CKr = KDF_RK(state.RK, DH(state.DHs, state.DHr))
+    //   state.DHs = GENERATE_DH()
+    //   state.RK, state.CKs = KDF_RK(state.RK, DH(state.DHs, state.DHr))
+    // so the receiver always ends one DH-ratchet step ahead of the peer.
+    // A prior browser test incorrectly asserted root_key equality after a
+    // ping-pong, which is mathematically impossible for a correct DR.
+    // These native tests guard that the core semantics stay spec-compliant.
+    #[test]
+    fn test_double_ratchet_root_key_invariants_after_init() {
+        let shared_secret = vec![1u8; 32];
+        let alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+
+        assert_eq!(
+            alice_state.root_key, bob_state.root_key,
+            "roots must match at init"
+        );
+        assert_eq!(
+            alice_state.root_key,
+            vec![1u8; 32],
+            "initial root equals shared_secret"
+        );
+    }
+
+    #[test]
+    fn test_double_ratchet_send_does_not_advance_root_key() {
+        let shared_secret = vec![1u8; 32];
+        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let before = alice_state.root_key.clone();
+        let _enc = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
+        let after = alice_state.root_key.clone();
+        assert_eq!(before, after, "encrypt must not advance root_key");
+    }
+
+    #[test]
+    fn test_double_ratchet_root_advances_on_receive() {
+        let shared_secret = vec![1u8; 32];
+        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let initial_root = alice_state.root_key.clone();
+
+        let enc1 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
+        let _ = double_ratchet_decrypt_internal(&mut bob_state, &enc1).unwrap();
+
+        assert_ne!(
+            bob_state.root_key, initial_root,
+            "Bob's root must advance on first DH ratchet"
+        );
+        assert_eq!(
+            alice_state.root_key, initial_root,
+            "Alice's root unchanged until she receives"
+        );
+    }
+
+    #[test]
+    fn test_double_ratchet_roots_diverge_after_pingpong() {
+        let shared_secret = vec![1u8; 32];
+        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let initial_root = alice_state.root_key.clone();
+
+        let enc1 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
+        let _ = double_ratchet_decrypt_internal(&mut bob_state, &enc1).unwrap();
+        let enc2 = double_ratchet_encrypt_internal(&mut bob_state, b"Message 2").unwrap();
+        let _ = double_ratchet_decrypt_internal(&mut alice_state, &enc2).unwrap();
+
+        assert_ne!(
+            alice_state.root_key, initial_root,
+            "Alice's root advances after receiving"
+        );
+        assert_ne!(
+            bob_state.root_key, initial_root,
+            "Bob's root advances after receiving"
+        );
+        assert_ne!(
+            alice_state.root_key, bob_state.root_key,
+            "per Signal spec, receiver ends one DH-ratchet step ahead of peer"
+        );
+    }
+
+    #[test]
+    fn test_double_ratchet_works_after_root_key_divergence() {
+        let shared_secret = vec![1u8; 32];
+        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+
+        let enc1 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
+        let dec1 = double_ratchet_decrypt_internal(&mut bob_state, &enc1).unwrap();
+        assert_eq!(dec1, b"Message 1");
+
+        let enc2 = double_ratchet_encrypt_internal(&mut bob_state, b"Message 2").unwrap();
+        let dec2 = double_ratchet_decrypt_internal(&mut alice_state, &enc2).unwrap();
+        assert_eq!(dec2, b"Message 2");
+
+        // Roots have diverged now; protocol must keep functioning.
+        let enc3 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 3").unwrap();
+        let dec3 = double_ratchet_decrypt_internal(&mut bob_state, &enc3).unwrap();
+        assert_eq!(dec3, b"Message 3");
+
+        let enc4 = double_ratchet_encrypt_internal(&mut bob_state, b"Message 4").unwrap();
+        let dec4 = double_ratchet_decrypt_internal(&mut alice_state, &enc4).unwrap();
+        assert_eq!(dec4, b"Message 4");
+    }
+
     #[test]
     fn test_double_ratchet_encrypt_no_chain_key() {
         let mut state = DoubleRatchetState::new();

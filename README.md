@@ -13,8 +13,17 @@
 <div align="center">
 
 [![Lint](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/lint.yml?branch=staging&label=Lint)](https://github.com/positive-intentions/signal-protocol/actions/workflows/lint.yml)
-[![Test](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test.yml?branch=staging&label=Test)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test.yml)
 [![Build](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/build.yml?branch=staging&label=Build)](https://github.com/positive-intentions/signal-protocol/actions/workflows/build.yml)
+
+[![Test Rust](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-rust.yml?branch=staging&label=Test%20Rust)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-rust.yml)
+[![Test Jest](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-jest.yml?branch=staging&label=Test%20Jest)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-jest.yml)
+[![Test WASM Node](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-wasm-node.yml?branch=staging&label=Test%20WASM%20Node)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-wasm-node.yml)
+[![Test WASM Browser](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-wasm-browser.yml?branch=staging&label=Test%20WASM%20Browser)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-wasm-browser.yml)
+
+[![Verify F*](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-fstar.yml?branch=staging&label=Verify%20F%2A)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-fstar.yml)
+[![Verify Rocq](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-rocq.yml?branch=staging&label=Verify%20Rocq)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-rocq.yml)
+[![Verify Lean](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-lean.yml?branch=staging&label=Verify%20Lean)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-lean.yml)
+[![Verify ProVerif](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-proverif.yml?branch=staging&label=Verify%20ProVerif)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-proverif.yml)
 </div>
 
 
