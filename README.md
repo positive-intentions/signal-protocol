@@ -4,6 +4,7 @@
 <img src="signal.png" alt="App Logo" />
 </div>
 
+> **Warning:** This project has not been audited or security-reviewed. It is open source for transparency and educational purposes. Use at your own risk.
 
 <div align="center">
   
@@ -15,19 +16,24 @@
 [![Lint](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/lint.yml?branch=staging&label=Lint)](https://github.com/positive-intentions/signal-protocol/actions/workflows/lint.yml)
 [![Build](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/build.yml?branch=staging&label=Build)](https://github.com/positive-intentions/signal-protocol/actions/workflows/build.yml)
 
-[![Test Rust](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-rust.yml?branch=staging&label=Test%20Rust)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-rust.yml)
-[![Test Jest](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-jest.yml?branch=staging&label=Test%20Jest)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-jest.yml)
-[![Test WASM Node](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-wasm-node.yml?branch=staging&label=Test%20WASM%20Node)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-wasm-node.yml)
-[![Test WASM Browser](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-wasm-browser.yml?branch=staging&label=Test%20WASM%20Browser)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-wasm-browser.yml)
-
-[![Verify F*](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-fstar.yml?branch=staging&label=Verify%20F%2A)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-fstar.yml)
-[![Verify Rocq](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-rocq.yml?branch=staging&label=Verify%20Rocq)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-rocq.yml)
-[![Verify Lean](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-lean.yml?branch=staging&label=Verify%20Lean)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-lean.yml)
-[![Verify ProVerif](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-proverif.yml?branch=staging&label=Verify%20ProVerif)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-proverif.yml)
 </div>
 
+### Tests
 
-> **Warning:** This project has not been audited or security-reviewed. It is open source for transparency and educational purposes. Use at your own risk.
+| Rust | Jest | WASM (Node) | WASM (browser) |
+| :---: | :---: | :---: | :---: |
+| [![Test Rust](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-rust.yml?branch=staging&label=Test%20Rust)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-rust.yml) | [![Test Jest](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-jest.yml?branch=staging&label=Test%20Jest)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-jest.yml) | [![Test WASM Node](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-wasm-node.yml?branch=staging&label=Test%20WASM%20Node)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-wasm-node.yml) | [![Test WASM Browser](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/test-wasm-browser.yml?branch=staging&label=Test%20WASM%20Browser)](https://github.com/positive-intentions/signal-protocol/actions/workflows/test-wasm-browser.yml) |
+
+### Formal verification
+
+| Tool | Lite | Full |
+| :--- | :---: | :---: |
+| **F\*** | [![F* lite](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-fstar.yml?branch=staging&label=F%2A%20lite)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-fstar.yml) | [![F* full](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-fstar-full.yml?branch=staging&label=F%2A%20full)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-fstar-full.yml) |
+| **Rocq** | [![Rocq abstract](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-rocq.yml?branch=staging&label=Rocq%20abstract)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-rocq.yml) | [![Rocq full](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-rocq-full.yml?branch=staging&label=Rocq%20full)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-rocq-full.yml) |
+| **Lean** | [![Lean lite](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-lean.yml?branch=staging&label=Lean%20lite)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-lean.yml) | [![Lean full](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-lean-full.yml?branch=staging&label=Lean%20full)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-lean-full.yml) |
+| **ProVerif** | — | [![ProVerif](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/verify-proverif.yml?branch=staging&label=ProVerif)](https://github.com/positive-intentions/signal-protocol/actions/workflows/verify-proverif.yml) |
+
+
 
 A Rust implementation of the Signal Protocol compiled to WebAssembly (WASM) for use in web browsers and Node.js environments.
 

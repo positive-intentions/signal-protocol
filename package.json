@@ -61,6 +61,7 @@
     "wasm-pack": "export PATH=\"$HOME/.cargo/bin:$PATH\" && wasm-pack",
     "verify": "bash scripts/verify-dispatch.sh",
     "verify:host": "echo '🔐 Running all formal verifications...' && npm run verify:fstar:lite && npm run verify:rocq:abstract && npm run verify:lean:lite && echo '✅ All verifications passed!'",
+    "verify:host:full": "echo '🔐 Running full formal verifications (F* + Rocq + Lean)...' && npm run verify:fstar && npm run verify:rocq && npm run verify:lean && echo '✅ All full verifications passed!'",
     "verify:docker": "sudo docker compose run --rm verify-runner",
     "verify:fstar": "cd signal-protocol-core/proofs/fstar/extraction && eval $(opam env) && PATH=\"$HOME/.opam/5.1.1/bin:$PATH\" FSTAR_Z3_EXE=$HOME/.opam/5.1.1/bin/z3-4.13.3 make verify",
     "verify:fstar:lite": "cd signal-protocol-core/proofs/fstar/extraction && eval $(opam env) && PATH=\"$HOME/.opam/5.1.1/bin:$PATH\" FSTAR_Z3_EXE=$HOME/.opam/5.1.1/bin/z3-4.13.3 make verify-lite",
