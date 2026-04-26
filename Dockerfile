@@ -153,7 +153,7 @@ RUN cd /tmp && \
 # Install Lean via elan
 ENV ELAN_HOME=/root/.elan \
     PATH=/root/.elan/bin:${PATH}
-RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.28.0-rc1 && \
+RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.28.1 && \
     elan toolchain list && \
     lean --version
 
