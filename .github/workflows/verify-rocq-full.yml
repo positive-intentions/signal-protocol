@@ -2,9 +2,9 @@ name: Verify Rocq (full)
 
 on:
   push:
-    branches: [staging]
+    branches: [feat/updating-testing-scripts]
   pull_request:
-    branches: [staging]
+    branches: [feat/updating-testing-scripts]
   workflow_dispatch:
 
 concurrency:
