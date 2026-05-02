@@ -1,0 +1,6 @@
+# F* verification artifacts
+.cache/
+.hints/
+*.checked
+*.hints
+.depend

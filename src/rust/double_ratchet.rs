@@ -5,7 +5,9 @@
 use crate::rust::crypto::uint8_array_to_vec;
 use crate::rust::types::KeyPair;
 use js_sys::Uint8Array;
+use signal_protocol_core::SkippedKey;
 use std::collections::BTreeMap;
+use std::fmt;
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
@@ -83,7 +85,7 @@ pub struct DoubleRatchetState {
     #[wasm_bindgen(skip)]
     pub previous_chain_length: u32,
     #[wasm_bindgen(skip)]
-    pub skipped_message_keys: BTreeMap<String, Vec<u8>>,
+    pub skipped_message_keys: BTreeMap<SkippedKey, Vec<u8>>,
 }
 
 #[wasm_bindgen]
@@ -115,7 +117,7 @@ impl DoubleRatchetState {
 }
 
 #[wasm_bindgen]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DoubleRatchetMessage {
     #[wasm_bindgen(skip)]
     pub ciphertext: Vec<u8>,
@@ -147,6 +149,17 @@ impl DoubleRatchetMessage {
     #[wasm_bindgen(getter)]
     pub fn previous_chain_length(&self) -> u32 {
         self.previous_chain_length
+    }
+}
+
+impl fmt::Debug for DoubleRatchetMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DoubleRatchetMessage")
+            .field("ciphertext_len", &self.ciphertext.len())
+            .field("dh_public_key_len", &self.dh_public_key.len())
+            .field("message_number", &self.message_number)
+            .field("previous_chain_length", &self.previous_chain_length)
+            .finish_non_exhaustive()
     }
 }
 
@@ -235,7 +248,8 @@ pub fn cleanup_skipped_message_keys(state: &mut DoubleRatchetState, max_keys: us
     removed
 }
 
-/// Perform DH ratchet step - delegates to core (for tests)
+/// Perform DH ratchet step - delegates to core (host `native_tests` only).
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn perform_dh_ratchet_step(
     state: &mut DoubleRatchetState,
     new_remote_public_key: &[u8],
@@ -246,7 +260,8 @@ pub(crate) fn perform_dh_ratchet_step(
     Ok(())
 }
 
-/// Skip message keys - delegates to core (for tests)
+/// Skip message keys - delegates to core (host `native_tests` only).
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn skip_message_keys(
     state: &mut DoubleRatchetState,
     until_message_number: u32,
@@ -257,7 +272,8 @@ pub(crate) fn skip_message_keys(
     Ok(())
 }
 
-/// Cleanup skipped keys internal - delegates to core (for tests)
+/// Cleanup skipped keys internal - delegates to core (host `native_tests` only).
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn cleanup_skipped_message_keys_internal(
     state: &mut DoubleRatchetState,
     max_keys: usize,
@@ -269,7 +285,8 @@ pub(crate) fn cleanup_skipped_message_keys_internal(
     removed
 }
 
-/// Internal version for native testing - delegates to core
+/// Internal version for host unit tests - delegates to core (not built for wasm32).
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn initialize_double_ratchet_internal(
     shared_secret: &[u8],
     is_initiator: bool,
@@ -278,7 +295,8 @@ pub(crate) fn initialize_double_ratchet_internal(
         .map(core_to_wasm_state)
 }
 
-/// Internal encrypt for native testing - delegates to core
+/// Internal encrypt for host unit tests - delegates to core (not built for wasm32).
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn double_ratchet_encrypt_internal(
     state: &mut DoubleRatchetState,
     plaintext: &[u8],
@@ -295,7 +313,8 @@ pub(crate) fn double_ratchet_encrypt_internal(
     })
 }
 
-/// Internal decrypt for native testing - delegates to core
+/// Internal decrypt for host unit tests - delegates to core (not built for wasm32).
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn double_ratchet_decrypt_internal(
     state: &mut DoubleRatchetState,
     message: &DoubleRatchetMessage,
@@ -319,6 +338,7 @@ mod tests {
     use super::*;
     use wasm_bindgen_test::*;
     wasm_bindgen_test_configure!(run_in_browser);
+    use crate::rust::crypto::sign_data;
     use crate::rust::keys::*;
     use crate::rust::x3dh::x3dh_initiate;
 
@@ -601,11 +621,19 @@ mod tests {
         let alice_ephemeral = generate_ephemeral_keypair().unwrap();
         let bob_identity = generate_identity_keypair().unwrap();
         let bob_signed_prekey = generate_signed_prekey().unwrap();
+        let bob_spk_sig = sign_data(
+            &bob_identity.ed25519().private_key(),
+            &bob_signed_prekey.public_key(),
+        )
+        .unwrap();
         let x3dh_result = x3dh_initiate(
             &alice_identity.private_key(),
+            &alice_identity.public_key(),
             &alice_ephemeral.private_key(),
             &bob_identity.public_key(),
+            &bob_identity.ed25519().public_key(),
             &bob_signed_prekey.public_key(),
+            &bob_spk_sig,
             None,
         )
         .unwrap();

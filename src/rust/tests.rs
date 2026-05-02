@@ -45,6 +45,9 @@ mod wasm_tests {
         
         assert_eq!(public_key_vec.len(), 32); // X25519 public key size
         assert_eq!(private_key_vec.len(), 32); // X25519 private key size
+        let ed = identity_keys.ed25519();
+        assert_eq!(ed.public_key().length(), 32);
+        assert_eq!(ed.private_key().length(), 32);
         
         // Test signed prekey generation
         let signed_prekey_result = generate_signed_prekey();
@@ -92,8 +95,8 @@ mod wasm_tests {
 
     #[wasm_bindgen_test]
     fn test_signature_operations_basic() {
-        // For Ed25519 signatures, we need to generate a proper Ed25519 key pair
-        // NOTE: generate_identity_keypair() creates X25519 keys for ECDH, NOT for signing
+        // For Ed25519 signatures, use [`IdentityKeyPair::ed25519`] from
+        // `generate_identity_keypair()`, or generate an Ed25519 key pair as below.
         use ed25519_dalek::SigningKey;
         use rand::RngCore;
 
@@ -628,114 +631,143 @@ mod native_tests {
         let bob_identity = generate_x25519_keypair_internal();
         let bob_signed_prekey = generate_x25519_keypair_internal();
         
+        // Whitepaper-faithful X3DH AAD is now IK_a || IK_b (each 32 bytes).
+        let expected_aad = {
+            let mut v = Vec::with_capacity(64);
+            v.extend_from_slice(&alice_identity.public_key);
+            v.extend_from_slice(&bob_identity.public_key);
+            v
+        };
+
         // Alice initiates X3DH without one-time prekey
         let result = x3dh_initiate_internal(
             &alice_identity.private_key,
+            &alice_identity.public_key,
             &alice_ephemeral.private_key,
             &bob_identity.public_key,
             &bob_signed_prekey.public_key,
             None,
         ).unwrap();
-        
+
         assert_eq!(result.shared_secret.len(), 32);
-        assert_eq!(result.associated_data, b"X3DH_Key_Exchange".to_vec());
+        assert_eq!(result.associated_data, expected_aad);
     }
 
     #[test]
     fn test_x3dh_initiate_with_one_time_prekey() {
-        // Generate keypairs for Alice and Bob
         let alice_identity = generate_x25519_keypair_internal();
         let alice_ephemeral = generate_x25519_keypair_internal();
         let bob_identity = generate_x25519_keypair_internal();
         let bob_signed_prekey = generate_x25519_keypair_internal();
         let bob_one_time_prekey = generate_x25519_keypair_internal();
-        
-        // Alice initiates X3DH with one-time prekey
+
+        let expected_aad = {
+            let mut v = Vec::with_capacity(64);
+            v.extend_from_slice(&alice_identity.public_key);
+            v.extend_from_slice(&bob_identity.public_key);
+            v
+        };
+
         let result = x3dh_initiate_internal(
             &alice_identity.private_key,
+            &alice_identity.public_key,
             &alice_ephemeral.private_key,
             &bob_identity.public_key,
             &bob_signed_prekey.public_key,
             Some(&bob_one_time_prekey.public_key),
         ).unwrap();
-        
+
         assert_eq!(result.shared_secret.len(), 32);
-        assert_eq!(result.associated_data, b"X3DH_Key_Exchange".to_vec());
+        assert_eq!(result.associated_data, expected_aad);
     }
 
     #[test]
     fn test_x3dh_respond_without_one_time_prekey() {
-        // Generate keypairs for Alice and Bob
         let alice_identity = generate_x25519_keypair_internal();
         let alice_ephemeral = generate_x25519_keypair_internal();
         let bob_identity = generate_x25519_keypair_internal();
         let bob_signed_prekey = generate_x25519_keypair_internal();
-        
-        // Bob responds to X3DH without one-time prekey
+
+        let expected_aad = {
+            let mut v = Vec::with_capacity(64);
+            v.extend_from_slice(&alice_identity.public_key);
+            v.extend_from_slice(&bob_identity.public_key);
+            v
+        };
+
         let result = x3dh_respond_internal(
             &bob_identity.private_key,
+            &bob_identity.public_key,
             &bob_signed_prekey.private_key,
             None,
             &alice_identity.public_key,
             &alice_ephemeral.public_key,
         ).unwrap();
-        
+
         assert_eq!(result.shared_secret.len(), 32);
-        assert_eq!(result.associated_data, b"X3DH_Key_Exchange".to_vec());
+        assert_eq!(result.associated_data, expected_aad);
     }
 
     #[test]
     fn test_x3dh_respond_with_one_time_prekey() {
-        // Generate keypairs for Alice and Bob
         let alice_identity = generate_x25519_keypair_internal();
         let alice_ephemeral = generate_x25519_keypair_internal();
         let bob_identity = generate_x25519_keypair_internal();
         let bob_signed_prekey = generate_x25519_keypair_internal();
         let bob_one_time_prekey = generate_x25519_keypair_internal();
-        
-        // Bob responds to X3DH with one-time prekey
+
         let result = x3dh_respond_internal(
             &bob_identity.private_key,
+            &bob_identity.public_key,
             &bob_signed_prekey.private_key,
             Some(&bob_one_time_prekey.private_key),
             &alice_identity.public_key,
             &alice_ephemeral.public_key,
         ).unwrap();
         
+        let expected_aad = {
+            let mut v = Vec::with_capacity(64);
+            v.extend_from_slice(&alice_identity.public_key);
+            v.extend_from_slice(&bob_identity.public_key);
+            v
+        };
+
         assert_eq!(result.shared_secret.len(), 32);
-        assert_eq!(result.associated_data, b"X3DH_Key_Exchange".to_vec());
+        assert_eq!(result.associated_data, expected_aad);
     }
 
     #[test]
     fn test_x3dh_symmetry() {
-        // Generate keypairs for Alice and Bob
         let alice_identity = generate_x25519_keypair_internal();
         let alice_ephemeral = generate_x25519_keypair_internal();
         let bob_identity = generate_x25519_keypair_internal();
         let bob_signed_prekey = generate_x25519_keypair_internal();
         let bob_one_time_prekey = generate_x25519_keypair_internal();
-        
-        // Alice initiates
+
         let alice_result = x3dh_initiate_internal(
             &alice_identity.private_key,
+            &alice_identity.public_key,
             &alice_ephemeral.private_key,
             &bob_identity.public_key,
             &bob_signed_prekey.public_key,
             Some(&bob_one_time_prekey.public_key),
         ).unwrap();
-        
-        // Bob responds
+
         let bob_result = x3dh_respond_internal(
             &bob_identity.private_key,
+            &bob_identity.public_key,
             &bob_signed_prekey.private_key,
             Some(&bob_one_time_prekey.private_key),
             &alice_identity.public_key,
             &alice_ephemeral.public_key,
         ).unwrap();
-        
-        // Both should compute the same shared secret
+
+        // Both should compute the same shared secret AND the same AAD,
+        // since AAD = IK_a || IK_b is identity-bound and symmetric.
         assert_eq!(alice_result.shared_secret, bob_result.shared_secret, "X3DH must be symmetric");
         assert_eq!(alice_result.associated_data, bob_result.associated_data);
+        assert_eq!(alice_result.associated_data.len(), 64,
+                   "X3DH AAD = IK_a || IK_b is 64 bytes");
     }
 
     // Test message encryption/decryption functions
@@ -1551,10 +1583,12 @@ mod native_tests {
         assert_eq!(cloned.public_key, keypair.public_key);
         assert_eq!(cloned.private_key, keypair.private_key);
         
-        // Test debug format (basic serialization test)
+        // Debug must not echo field names or key material (redacted impl).
         let debug_str = format!("{:?}", keypair);
-        assert!(debug_str.contains("public_key"));
-        assert!(debug_str.contains("private_key"));
+        assert!(debug_str.contains("KeyPair"));
+        assert!(debug_str.contains("redacted"));
+        assert!(!debug_str.contains("public_key"));
+        assert!(!debug_str.contains("private_key"));
     }
 
     // Test edge cases for data structures
@@ -1929,9 +1963,13 @@ mod native_tests {
     #[test]
     fn test_cleanup_skipped_message_keys_none_to_remove() {
         let mut state = DoubleRatchetState::new();
-        state.skipped_message_keys.insert("key1".to_string(), vec![1u8; 32]);
-        state.skipped_message_keys.insert("key2".to_string(), vec![2u8; 32]);
-        
+        state
+            .skipped_message_keys
+            .insert((vec![1u8; 32], 0), vec![1u8; 32]);
+        state
+            .skipped_message_keys
+            .insert((vec![1u8; 32], 1), vec![2u8; 32]);
+
         let removed = cleanup_skipped_message_keys_internal(&mut state, 5);
         assert_eq!(removed, 0);
         assert_eq!(state.skipped_message_keys.len(), 2);
@@ -2128,6 +2166,7 @@ mod native_tests {
         
         let result = x3dh_initiate_internal(
             &alice_identity.private_key,
+            &alice_identity.public_key,
             &alice_ephemeral.private_key,
             &bob_identity.public_key,
             &bob_signed_prekey.public_key,

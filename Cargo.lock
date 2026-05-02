@@ -698,12 +698,15 @@ dependencies = [
  "hax-lib",
  "hex",
  "hkdf",
+ "hmac",
  "rand",
  "rand_core",
  "serde",
  "sha2",
+ "subtle",
  "thiserror",
  "x25519-dalek",
+ "zeroize",
 ]
 
 [[package]]

@@ -107,10 +107,13 @@ export class SignalProtocolWasm {
     this._ensureReady();
 
     try {
-      const keypair = wasmModule.generate_identity_keypair();
+      const result = wasmModule.generate_identity_keypair();
+      const ed = result.ed25519();
       return {
-        publicKey: keypair.public_key,
-        privateKey: keypair.private_key,
+        publicKey: result.public_key,
+        privateKey: result.private_key,
+        ed25519PublicKey: ed.public_key,
+        ed25519PrivateKey: ed.private_key,
       };
     } catch (error) {
       throw new Error(`WASM identity key generation failed: ${error.message}`);
@@ -252,13 +255,17 @@ export class SignalProtocolWasm {
   // =================== X3DH KEY EXCHANGE ===================
 
   /**
-   * Initiate X3DH key exchange (Alice side)
+   * Initiate X3DH key exchange (Alice side). Requires Bob's signed-prekey
+   * signature (over the SPK public key) and Bob's Ed25519 identity public key.
    */
   async x3dhInitiate(
     aliceIdentityPrivate,
+    aliceIdentityPublic,
     aliceEphemeralPrivate,
-    bobIdentityPublic,
+    bobIdentityX25519Public,
+    bobIdentityEd25519Public,
     bobSignedPrekeyPublic,
+    bobSignedPrekeySignature,
     bobOneTimePrekeyPublic = null,
   ) {
     this._ensureReady();
@@ -272,18 +279,24 @@ export class SignalProtocolWasm {
       };
 
       const aliceIdPrivBytes = convertToBytes(aliceIdentityPrivate);
+      const aliceIdPubBytes = convertToBytes(aliceIdentityPublic);
       const aliceEphPrivBytes = convertToBytes(aliceEphemeralPrivate);
-      const bobIdPubBytes = convertToBytes(bobIdentityPublic);
+      const bobIdXBytes = convertToBytes(bobIdentityX25519Public);
+      const bobIdEdBytes = convertToBytes(bobIdentityEd25519Public);
       const bobSignedPubBytes = convertToBytes(bobSignedPrekeyPublic);
+      const bobSigBytes = convertToBytes(bobSignedPrekeySignature);
       const bobOneTimePubBytes = bobOneTimePrekeyPublic
         ? convertToBytes(bobOneTimePrekeyPublic)
         : null;
 
       const result = wasmModule.x3dh_initiate(
         aliceIdPrivBytes,
+        aliceIdPubBytes,
         aliceEphPrivBytes,
-        bobIdPubBytes,
+        bobIdXBytes,
+        bobIdEdBytes,
         bobSignedPubBytes,
+        bobSigBytes,
         bobOneTimePubBytes,
       );
 
@@ -302,6 +315,7 @@ export class SignalProtocolWasm {
    */
   async x3dhRespond(
     bobIdentityPrivate,
+    bobIdentityPublic,
     bobSignedPrekeyPrivate,
     bobOneTimePrekeyPrivate,
     aliceIdentityPublic,
@@ -319,6 +333,7 @@ export class SignalProtocolWasm {
       };
 
       const bobIdPrivBytes = convertToBytes(bobIdentityPrivate);
+      const bobIdPubBytes = convertToBytes(bobIdentityPublic);
       const bobSignedPrivBytes = convertToBytes(bobSignedPrekeyPrivate);
       const bobOneTimePrivBytes = convertToBytes(bobOneTimePrekeyPrivate);
       const aliceIdPubBytes = convertToBytes(aliceIdentityPublic);
@@ -326,6 +341,7 @@ export class SignalProtocolWasm {
 
       const result = wasmModule.x3dh_respond(
         bobIdPrivBytes,
+        bobIdPubBytes,
         bobSignedPrivBytes,
         bobOneTimePrivBytes,
         aliceIdPubBytes,
@@ -555,7 +571,7 @@ export const SignalWasmHelpers = {
 
     // Generate signature for signed prekey
     const signedPrekeySignature = await wasmInstance.signData(
-      identityKeyPair.privateKey,
+      identityKeyPair.ed25519PrivateKey,
       signedPrekeyPair.publicKey,
     );
 
@@ -581,6 +597,7 @@ export const SignalWasmHelpers = {
   async getPublicKeyBundle(user) {
     return {
       identityKey: user.identityKeyPair.publicKey,
+      identityEd25519Key: user.identityKeyPair.ed25519PublicKey,
       signedPrekey: user.signedPrekeyPair.publicKey,
       signedPrekeySignature: user.signedPrekeySignature,
       oneTimePrekey:
@@ -600,9 +617,12 @@ export const SignalWasmHelpers = {
     // Initiate X3DH
     const result = await wasmInstance.x3dhInitiate(
       alice.identityKeyPair.privateKey,
+      alice.identityKeyPair.publicKey,
       aliceEphemeral.privateKey,
       bobBundle.identityKey,
+      bobBundle.identityEd25519Key,
       bobBundle.signedPrekey,
+      bobBundle.signedPrekeySignature,
       bobBundle.oneTimePrekey,
     );
 

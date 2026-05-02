@@ -122,8 +122,10 @@ services:
     command: >
       bash -lc "
         if [ ! -d hax-upstream/hax-lib ]; then
-          echo 'Cloning hax-upstream (hacspec/hax) for proof libraries...';
-          git clone --depth=1 https://github.com/hacspec/hax.git hax-upstream;
+          COMMIT=\"$(cat hax-upstream.commit | tr -d '[:space:]')\";
+          echo \"Cloning hacspec/hax pinned to $COMMIT...\";
+          git clone https://github.com/hacspec/hax.git hax-upstream;
+          ( cd hax-upstream && git checkout --detach \"$COMMIT\" );
         fi;
         eval \"$(opam env)\";
         npm run verify:host
@@ -162,6 +164,8 @@ services:
       - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     command: cargo hax into lean
 
+  # NOTE: lean-verify targets the *experimental* Lean track. The Lean
+  # backend is not part of the verified claim - see proofs/experimental/.
   lean-verify:
     build:
       context: .
@@ -170,7 +174,7 @@ services:
       - ./signal-protocol-core:/app/signal-protocol-core
     environment:
       - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    working_dir: /app/signal-protocol-core/proofs/lean
+    working_dir: /app/signal-protocol-core/proofs/experimental/lean
     command: lake build
 
   lean-shell:
@@ -194,6 +198,14 @@ services:
     environment:
       - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+  # The previous proverif-x3dh / proverif-double-ratchet sub-services
+  # invoked broken model files (e.g. proverif/x3dh/x3dh_complete.pv)
+  # that have been replaced by the new top-level x3dh.pv,
+  # double_ratchet.pv, etc. Use the `proverif` service above to run
+  # the full ProVerif suite via test_proverif.sh, or invoke a single
+  # model directly:
+  #   docker compose run --rm proverif proverif proverif/x3dh.pv
+
   proverif-x3dh:
     build:
       context: .
@@ -202,7 +214,7 @@ services:
       - ./formal-proofs:/app/formal-proofs
     environment:
       - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    command: proverif proverif/x3dh/x3dh_complete.pv
+    command: proverif proverif/x3dh.pv
 
   proverif-double-ratchet:
     build:
@@ -212,7 +224,7 @@ services:
       - ./formal-proofs:/app/formal-proofs
     environment:
       - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    command: proverif proverif/double_ratchet/double_ratchet_security.pv
+    command: proverif proverif/double_ratchet.pv
 
   formal-shell:
     build:
@@ -238,6 +250,9 @@ services:
     stdin_open: true
     tty: true
 
+  # NOTE: coq-verify targets the *experimental* Rocq track. The Rocq
+  # backend is not part of the verified claim - see proofs/experimental/.
+  # The default target compiles only the hand-written AbstractCrypto.v.
   coq-verify:
     build:
       context: .
@@ -246,5 +261,5 @@ services:
       - ./signal-protocol-core:/app/signal-protocol-core
     environment:
       - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    working_dir: /app/signal-protocol-core/proofs/coq/extraction
-    command: make verify
+    working_dir: /app/signal-protocol-core/proofs/experimental/coq/extraction
+    command: make verify-abstract

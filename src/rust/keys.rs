@@ -5,7 +5,7 @@
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
-use crate::rust::types::KeyPair;
+use crate::rust::types::{IdentityKeyPair, KeyPair};
 
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
@@ -18,42 +18,30 @@ fn log(s: &str) {
     }
 }
 
-/// Internal function to generate an X25519 key pair - delegates to core
+/// Internal function to generate an X25519 key pair - delegates to core.
 pub(crate) fn generate_x25519_keypair_internal() -> KeyPair {
-    let core_keypair = signal_protocol_core::generate_identity_keypair();
+    let core_keypair = signal_protocol_core::generate_x25519_keypair_internal();
     KeyPair {
         public_key: core_keypair.public_key,
         private_key: core_keypair.private_key,
     }
 }
 
-/// Generate an identity key pair for long-term user identification
+/// Generate a long-term identity: X25519 (X3DH DH) and Ed25519 (signed-prekey
+/// signatures), matching [`signal_protocol_core::generate_identity_keypair`].
 ///
-/// Identity keys are long-lived keys that identify a user or device.
-/// They are used in the X3DH key exchange protocol and for signing
-/// other keys to establish authenticity.
-///
-/// ## Implementation
-/// Uses X25519 (Curve25519 Diffie-Hellman) for key agreement operations.
-/// This provides 128-bit security level with efficient constant-time operations.
-///
-/// ## Security Properties
-/// - Uses OS-level entropy source (OsRng)
-/// - Generates proper Curve25519 scalar/point pair
-/// - Public key is valid curve point derived via scalar multiplication
-/// - Constant-time operations prevent timing attacks
-///
-/// ## Usage
-/// Each user/device should generate one identity key pair and use it
-/// consistently across all communication sessions. The public key
-/// can be distributed through a key server or other trusted mechanism.
+/// [`public_key`] / [`private_key`] on the returned value refer to the X25519
+/// half (same as historical WASM API). Use [`IdentityKeyPair::ed25519`] for the
+/// signing keypair when building or verifying prekey bundles.
 ///
 /// ## Returns
-/// A `KeyPair` containing the identity public and private keys (32 bytes each)
+/// An [`IdentityKeyPair`] with both cryptographic halves.
 #[wasm_bindgen]
-pub fn generate_identity_keypair() -> Result<KeyPair, JsValue> {
-    log("Generating identity keypair using X25519");
-    Ok(generate_x25519_keypair_internal())
+pub fn generate_identity_keypair() -> Result<IdentityKeyPair, JsValue> {
+    log("Generating identity keypair (X25519 + Ed25519)");
+    Ok(IdentityKeyPair::from_core(
+        signal_protocol_core::generate_identity_keypair(),
+    ))
 }
 
 /// Generate a signed prekey for medium-term use in key exchanges

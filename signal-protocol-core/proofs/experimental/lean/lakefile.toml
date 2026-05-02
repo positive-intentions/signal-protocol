@@ -1,0 +1,13 @@
+name = "SignalProtocolCore"
+version = "0.1.0"
+defaultTargets = ["SignalProtocolCore"]
+
+[[lean_lib]]
+name = "SignalProtocolCore"
+roots = ["extraction.signal_protocol_core", "extraction.AbstractCrypto"]
+
+[[require]]
+name = "Hax"
+# Path was bumped one level when this proof was moved to
+# proofs/experimental/lean/ (Phase 5 of the verified-claim cleanup).
+path = "../../../../hax-upstream/hax-lib/proof-libs/lean"

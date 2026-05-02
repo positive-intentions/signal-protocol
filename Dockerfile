@@ -137,9 +137,19 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
     rustup default nightly-2025-02-01 && \
     rustc --version && cargo --version
 
-# Install F*, Rocq, Z3, and ProVerif via OPAM
+# Install F*, Rocq, Z3, and ProVerif via OPAM. Versions are pinned
+# explicitly so the verification result is reproducible across CI runs
+# and mirror moves; bumping a tool requires a deliberate edit here.
+ARG FSTAR_VERSION=2025.03.25
+ARG Z3_VERSION=4.13.3
+ARG ROCQ_VERSION=9.0.0
+ARG PROVERIF_VERSION=2.05
 RUN eval $(opam env) && \
-    opam install -y --no-depexts z3 fstar rocq-prover proverif
+    opam install -y --no-depexts \
+      z3.${Z3_VERSION} \
+      fstar.${FSTAR_VERSION} \
+      rocq-prover.${ROCQ_VERSION} \
+      proverif.${PROVERIF_VERSION}
 
 # Pinned Z3 binary for F* (Makefile --z3version 4.13.3; npm FSTAR_Z3_EXE). OPAM's z3 may be newer.
 RUN cd /tmp && \
@@ -157,10 +167,14 @@ RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -
     elan toolchain list && \
     lean --version
 
-# Install hax from git
+# Install hax from git, pinned to the commit recorded in
+# `hax-upstream.commit`. Pinning ensures a hax release that breaks
+# extraction does not silently land between CI runs.
+ARG HAX_COMMIT=492a34e33c8744b9672eb3cf1c982ac40469f7d4
 RUN eval $(opam env) && \
     git clone https://github.com/hacspec/hax.git /tmp/hax && \
     cd /tmp/hax && \
+    git checkout --detach "$HAX_COMMIT" && \
     ./setup.sh && \
     rm -rf /tmp/hax
 

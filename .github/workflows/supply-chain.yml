@@ -1,0 +1,69 @@
+name: Supply chain
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [staging]
+  schedule:
+    # Re-run on a schedule even without code changes so that newly-
+    # filed advisories are surfaced as soon as they appear in the
+    # rustsec database.
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: supply-chain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: cargo audit (RUSTSEC advisories)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+
+      - name: Run cargo audit on root crate
+        run: cargo audit --deny warnings
+
+      - name: Run cargo audit on signal-protocol-core
+        run: cargo audit --file signal-protocol-core/Cargo.lock --deny warnings
+
+  deny:
+    name: cargo deny (licence + bans + sources)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-deny-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny
+
+      - name: Run cargo deny check
+        run: cargo deny --all-features check

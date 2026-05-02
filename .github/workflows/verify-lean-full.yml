@@ -1,4 +1,7 @@
-name: Verify Lean (full)
+# EXPERIMENTAL: full Lean lake build (classic proofs/lean path).
+# Not part of the primary verified claim. See proofs/experimental/README.md.
+
+name: "[experimental] Verify Lean (full)"
 
 on:
   push:
@@ -13,7 +16,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Lean formal verification (full lake build)
+    name: Lean (experimental, full verify)
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -41,8 +44,10 @@ jobs:
             signal-protocol-verify-runner:latest \
             bash -lc '
               if [ ! -d hax-upstream/hax-lib ]; then
-                echo "Cloning hax-upstream (hacspec/hax) for proof libraries..."
-                git clone --depth=1 https://github.com/hacspec/hax.git hax-upstream
+                COMMIT="$(cat hax-upstream.commit | tr -d "[:space:]")"
+                echo "Cloning hacspec/hax pinned to $COMMIT..."
+                git clone https://github.com/hacspec/hax.git hax-upstream
+                ( cd hax-upstream && git checkout --detach "$COMMIT" )
               fi
               eval "$(opam env)"
               npm run verify:lean

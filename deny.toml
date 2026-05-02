@@ -1,0 +1,69 @@
+# cargo-deny configuration
+#
+# Run with: cargo deny --all-features check
+#
+# This config is consumed by .github/workflows/supply-chain.yml on
+# every PR. It enforces the project's licence policy, vets the
+# dependency graph for known security advisories, and refuses sources
+# outside crates.io / git allow-listed below.
+
+[graph]
+all-features    = true
+no-default-features = false
+
+# === Advisories: cargo audit equivalent ===
+# Block any unfixed advisory. Yanked versions are also a build break.
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked  = "deny"
+ignore  = []
+
+# === Licence policy ===
+# The project is licensed GPL-3.0-only (see LICENSE). All dependencies
+# must be GPL-3.0-only-compatible. Common permissive licences are
+# allowed (MIT, Apache-2.0, BSD, ISC, Unicode, Zlib, etc.) because
+# combining them with GPL-3.0-only is permitted.
+[licenses]
+# Top-level licence we are *publishing under* - any dependency that
+# refuses to allow combination with this licence is rejected.
+allow = [
+    "GPL-3.0",
+    "LGPL-3.0",
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "Apache-2.0 WITH LLVM-exception",
+]
+confidence-threshold = 0.93
+exceptions = []
+
+# === Source policy ===
+# All crates must come from a known registry; refuse opaque git deps.
+[sources]
+unknown-registry = "deny"
+unknown-git      = "deny"
+allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
+allow-git        = []
+
+# === Bans ===
+# Reject duplicate versions of the same crate (cuts attack surface and
+# bloat) and unknown crates. `skip` listed crates are known-safe
+# duplicates.
+[bans]
+multiple-versions    = "warn"
+wildcards            = "deny"
+highlight            = "all"
+deny                 = []
+skip                 = []
+skip-tree            = []
+# `path = "..."` deps inside the workspace are treated by cargo-deny
+# as wildcards. Allow them via the workspace exception so the in-tree
+# `signal-protocol-core` path dep does not trip the wildcard ban.
+allow-wildcard-paths = true

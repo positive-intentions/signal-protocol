@@ -140,7 +140,10 @@ mod wasm_tests {
         assert_eq!(keypair.public_key().length(), 32);
         assert_eq!(keypair.private_key().length(), 32);
         
-        // Keys should be different
+        let ed = keypair.ed25519();
+        assert_eq!(ed.public_key().length(), 32);
+        assert_eq!(ed.private_key().length(), 32);
+
         let pub_bytes: Vec<u8> = keypair.public_key().to_vec();
         let priv_bytes: Vec<u8> = keypair.private_key().to_vec();
         assert_ne!(pub_bytes, priv_bytes);

@@ -1,0 +1,156 @@
+(*****************************************************************
+ *
+ *  formal-proofs/proverif/double_ratchet.pv
+ *
+ *  Double Ratchet protocol per Signal Double Ratchet whitepaper v1.0.
+ *  Mirrors the Rust implementation in
+ *  `signal-protocol-core/src/double_ratchet.rs` and the F* spec in
+ *  `signal-protocol-core/proofs/fstar/spec/Spec.DoubleRatchet.fst`.
+ *
+ *  Threat model
+ *  ------------
+ *  - Public network channel `c` controlled by an active attacker.
+ *  - Both parties start with a shared secret `rk0` (modeled as a
+ *    free private bitstring; in practice this is the X3DH output).
+ *  - The DH ratchet uses fresh ephemeral keys per send.
+ *  - The attacker may compromise either party's full state in
+ *    `phase 1`; we then prove
+ *      * messages sent in phase 0 remain secret (forward secrecy),
+ *      * messages sent after at least one further DH ratchet step
+ *        in phase 2 also remain secret (post-compromise security).
+ *
+ *  KDF definitions match the whitepaper §3.5 / §5.2:
+ *      KDF_RK(rk, dh_out) -> hkdf(rk, dh_out, dr_info)         [used as `rk' || ck'`]
+ *      KDF_CK(ck)         -> ( hmac(ck, 0x01),  hmac(ck, 0x02) )
+ *
+ *****************************************************************)
+
+(* === Types and primitives === *)
+type skey.
+type pkey.
+
+fun pk(skey): pkey.
+
+fun dh(skey, pkey): bitstring.
+equation forall a: skey, b: skey;
+  dh(a, pk(b)) = dh(b, pk(a)).
+
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
+fun hmac(bitstring, bitstring): bitstring.
+
+fun senc(bitstring, bitstring, bitstring): bitstring.
+reduc forall k: bitstring, m: bitstring, ad: bitstring;
+  sdec(k, senc(k, m, ad), ad) = m.
+
+fun pk_to_bs(pkey): bitstring [data, typeConverter].
+
+free dr_info:   bitstring.
+free dr_byte01: bitstring.
+free dr_byte02: bitstring.
+free dr_aad:    bitstring.
+
+(* Public network channel. *)
+free c: channel.
+
+(* Shared root key from the X3DH handshake. Private to the modelled
+   processes; the attacker only sees it after `phase 1` corruption. *)
+free rk0: bitstring [private].
+
+(* Three-message conversation: each plaintext is unique. *)
+free m_phase0: bitstring [private].   (* Sent before any compromise. *)
+free m_phase1: bitstring [private].   (* Sent immediately after compromise. *)
+free m_phase2: bitstring [private].   (* Sent after a further DH ratchet. *)
+
+(* === Events === *)
+event sent_phase0(bitstring).
+event sent_phase1(bitstring).
+event sent_phase2(bitstring).
+event compromise_state(bitstring, bitstring).  (* (rk, ck) leaked at phase 1 *)
+
+(* === Queries === *)
+
+(* Forward secrecy: the phase-0 plaintext must remain secret even
+   though the entire ratchet state is leaked in phase 1. *)
+query attacker(m_phase0).
+
+(* Phase 1 plaintext is sent under a chain key that the attacker has;
+   the model below intentionally publishes the immediate-post-
+   compromise state, so this query may be `true` (broken). It is
+   asserted explicitly so any unexpected proof of secrecy is flagged
+   instead of silently accepted. *)
+query attacker(m_phase1).
+
+(* Post-compromise security: after one fresh DH ratchet step, secrecy
+   recovers, so the phase-2 plaintext must remain secret. *)
+query attacker(m_phase2).
+
+(* === Process: a single ratchet step composed of a DH ratchet
+       followed by one symmetric-ratchet message === *)
+
+let processSender(rk: bitstring, peer_dh: pkey) =
+  new sk: skey;
+  out(c, pk(sk));
+  let dh_out = dh(sk, peer_dh) in
+  let combined = hkdf(rk, dh_out, dr_info) in
+  (* Split combined as (rk', ck'): in the symbolic model we use two
+     distinct hkdf invocations to model the 64-byte split, so that
+     the attacker who learns rk' does not automatically learn ck'. *)
+  let rk_new = hkdf(rk, dh_out, dr_info) in
+  let ck_new = hkdf(rk, dh_out, dr_byte01) in
+  let mk     = hmac(ck_new, dr_byte01) in
+  out(c, mk).   (* For modelling: emit the chain output downstream. *)
+
+(* === Top-level conversation: phase 0 message, phase 1 corruption,
+       phase 2 recovery === *)
+
+process
+  new dh_alice0: skey;
+  new dh_bob0:   skey;
+  out(c, pk(dh_alice0));
+  out(c, pk(dh_bob0));
+
+  (* === PHASE 0: honest exchange under rk0.
+         The honest exchange computes ck0 from a DH operation between
+         the two ephemeral keys. mk0 is derived once and used to
+         encrypt m_phase0; the symmetric ratchet then advances
+         ck0 -> ck1 and ck0 / mk0 are wiped from memory. *)
+  let ck0    = hkdf(rk0, dh(dh_alice0, pk(dh_bob0)), dr_info) in
+  let mk0    = hmac(ck0, dr_byte01) in
+  let ct0    = senc(mk0, m_phase0, dr_aad) in
+  event sent_phase0(ct0);
+  out(c, ct0);
+  (* Symmetric ratchet step: ck0 is consumed, ck1 is the post-step
+     chain key that lives in memory. *)
+  let ck1 = hmac(ck0, dr_byte02) in
+
+  (* === PHASE 1: full state compromise.
+         Attacker learns the *current* state - rk0 and ck1 (NOT ck0
+         which has been wiped). The immediately-following phase-1
+         message is broken; the phase-0 message must remain secret
+         (forward secrecy: ck1 does not let the attacker recompute
+         ck0 because hmac is one-way in the symbolic model). *)
+  phase 1;
+  event compromise_state(rk0, ck1);
+  out(c, rk0);
+  out(c, ck1);
+  let mk1 = hmac(ck1, dr_byte01) in
+  let ct1 = senc(mk1, m_phase1, dr_aad) in
+  event sent_phase1(ct1);
+  out(c, ct1);
+
+  (* === PHASE 2: a fresh DH ratchet step recovers security.
+         New ephemeral DH keys are sampled and never leaked. The
+         attacker still has rk0 from phase 1 but does not learn the
+         new DH outputs because they involve fresh private keys. *)
+  phase 2;
+  new dh_alice1: skey;
+  new dh_bob1:   skey;
+  out(c, pk(dh_alice1));
+  out(c, pk(dh_bob1));
+  let dh_out_new = dh(dh_alice1, pk(dh_bob1)) in
+  let rk_new     = hkdf(rk0, dh_out_new, dr_info) in
+  let ck_new     = hkdf(rk_new, dh_out_new, dr_byte01) in
+  let mk2        = hmac(ck_new, dr_byte01) in
+  let ct2        = senc(mk2, m_phase2, dr_aad) in
+  event sent_phase2(ct2);
+  out(c, ct2)

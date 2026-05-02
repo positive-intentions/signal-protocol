@@ -40,7 +40,7 @@ pub mod wasm_tests;
 
 // Re-export main types and functions for easy access
 pub use error::SignalError;
-pub use types::{KeyPair, X3DHResult, EncryptionResult};
+pub use types::{EncryptionResult, IdentityKeyPair, KeyPair, X3DHResult};
 pub use keys::{
     generate_identity_keypair,
     generate_signed_prekey,
@@ -55,6 +55,7 @@ pub use utils::{
     deserialize_public_key,
     hkdf_derive_key,
     free_keypair,
+    free_identity_keypair,
     free_buffer
 };
 pub use double_ratchet::{

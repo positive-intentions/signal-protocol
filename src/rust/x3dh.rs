@@ -27,9 +27,17 @@ fn log(s: &str) {
     }
 }
 
-/// Internal function to initiate X3DH key exchange - delegates to core
+/// Internal function to initiate X3DH key exchange - delegates to core.
+///
+/// `alice_identity_public` is the X25519 half of Alice's identity
+/// keypair; the WASM-side `x3dh_initiate` reconstructs it from
+/// Alice's existing keypair on the JS side. The whitepaper-faithful
+/// X3DH AAD `IK_a || IK_b` is computed inside the core function.
+/// Host unit tests only (`native_tests`); not built for wasm32.
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn x3dh_initiate_internal(
     alice_identity_private: &[u8],
+    alice_identity_public: &[u8],
     alice_ephemeral_private: &[u8],
     bob_identity_public: &[u8],
     bob_signed_prekey_public: &[u8],
@@ -37,6 +45,7 @@ pub(crate) fn x3dh_initiate_internal(
 ) -> Result<X3DHResult, crate::rust::error::SignalError> {
     let core_result = signal_protocol_core::x3dh_initiate_internal(
         alice_identity_private,
+        alice_identity_public,
         alice_ephemeral_private,
         bob_identity_public,
         bob_signed_prekey_public,
@@ -48,9 +57,13 @@ pub(crate) fn x3dh_initiate_internal(
     })
 }
 
-/// Internal function to respond to X3DH key exchange - delegates to core
+/// Internal function to respond to X3DH key exchange - delegates to core.
+///
+/// `bob_identity_public` is the X25519 half of Bob's identity
+/// keypair, used to build the X3DH AAD `IK_a || IK_b`.
 pub(crate) fn x3dh_respond_internal(
     bob_identity_private: &[u8],
+    bob_identity_public: &[u8],
     bob_signed_prekey_private: &[u8],
     bob_one_time_prekey_private: Option<&[u8]>,
     alice_identity_public: &[u8],
@@ -58,6 +71,7 @@ pub(crate) fn x3dh_respond_internal(
 ) -> Result<X3DHResult, crate::rust::error::SignalError> {
     let core_result = signal_protocol_core::x3dh_respond_internal(
         bob_identity_private,
+        bob_identity_public,
         bob_signed_prekey_private,
         bob_one_time_prekey_private,
         alice_identity_public,
@@ -69,78 +83,54 @@ pub(crate) fn x3dh_respond_internal(
     })
 }
 
-/// Initiate X3DH key exchange (Alice's side)
-/// 
-/// This function performs the X3DH key agreement from the initiator's perspective.
-/// Alice combines her keys with Bob's prekeys to compute a shared secret that
-/// both parties can independently derive.
-/// 
-/// ## X3DH Protocol Overview
-/// The X3DH protocol performs multiple Diffie-Hellman computations:
-/// 1. DH1: Alice_Identity_Private × Bob_SignedPrekey_Public
-/// 2. DH2: Alice_Ephemeral_Private × Bob_Identity_Public  
-/// 3. DH3: Alice_Ephemeral_Private × Bob_SignedPrekey_Public
-/// 4. DH4: Alice_Ephemeral_Private × Bob_OneTimePrekey_Public (optional)
-/// 
-/// The results are concatenated and fed into HKDF to derive the final shared secret.
-/// 
-/// ## Security Properties
-/// - **Forward Secrecy**: Compromise of long-term keys doesn't affect past sessions
-/// - **Authentication**: Both parties prove their identity through key ownership
-/// - **Asynchronous**: Bob doesn't need to be online during key exchange
-/// - **Deniability**: No long-term proof of participation in conversations
-/// 
-/// ## Parameters
-/// - `alice_identity_private`: Alice's long-term identity private key (32 bytes)
-/// - `alice_ephemeral_private`: Alice's session-specific ephemeral private key (32 bytes)
-/// - `bob_identity_public`: Bob's identity public key (32 bytes)
-/// - `bob_signed_prekey_public`: Bob's signed prekey public key (32 bytes)
-/// - `bob_one_time_prekey_public`: Optional one-time prekey for additional forward secrecy
-/// 
-/// ## Returns
-/// An `X3DHResult` containing the shared secret and associated data
-/// 
-/// ## Example Usage
-/// ```rust
-/// let result = x3dh_initiate(
-///     &alice_identity_private,
-///     &alice_ephemeral_private,
-///     &bob_identity_public,
-///     &bob_signed_prekey_public,
-///     Some(bob_one_time_prekey_public)
-/// )?;
-/// let shared_secret = result.shared_secret();
-/// ```
+/// Initiate X3DH key exchange (Alice's side).
+///
+/// Verifies Bob's signed-prekey signature under his **Ed25519** identity public
+/// key before deriving the shared secret (matches
+/// [`signal_protocol_core::x3dh_initiate`]). You must pass both of Bob's
+/// identity public keys: X25519 (for DH) and Ed25519 (for signature
+/// verification), plus the detached SPK signature over the SPK public key bytes.
 #[wasm_bindgen]
 pub fn x3dh_initiate(
     alice_identity_private: &Uint8Array,
+    alice_identity_public: &Uint8Array,
     alice_ephemeral_private: &Uint8Array,
-    bob_identity_public: &Uint8Array,
+    bob_identity_x25519_public: &Uint8Array,
+    bob_identity_ed25519_public: &Uint8Array,
     bob_signed_prekey_public: &Uint8Array,
+    bob_signed_prekey_signature: &Uint8Array,
     bob_one_time_prekey_public: Option<Uint8Array>,
 ) -> Result<X3DHResult, JsValue> {
-    log("Initiating X3DH key exchange (Alice side)");
-    
-    // Convert JavaScript arrays to Rust vectors
+    log("Initiating X3DH key exchange (Alice side, verified SPK signature)");
+
     let alice_identity_private_bytes = uint8_array_to_vec(alice_identity_private);
+    let alice_identity_public_bytes = uint8_array_to_vec(alice_identity_public);
     let alice_ephemeral_private_bytes = uint8_array_to_vec(alice_ephemeral_private);
-    let bob_identity_public_bytes = uint8_array_to_vec(bob_identity_public);
+    let bob_identity_x25519_public_bytes = uint8_array_to_vec(bob_identity_x25519_public);
+    let bob_identity_ed25519_public_bytes = uint8_array_to_vec(bob_identity_ed25519_public);
     let bob_signed_prekey_public_bytes = uint8_array_to_vec(bob_signed_prekey_public);
-    
-    let bob_one_time_prekey_opt = bob_one_time_prekey_public.as_ref().map(|k| {
-        uint8_array_to_vec(k)
-    });
-    
-    match x3dh_initiate_internal(
+    let bob_signed_prekey_signature_bytes = uint8_array_to_vec(bob_signed_prekey_signature);
+
+    let bob_one_time_prekey_opt = bob_one_time_prekey_public
+        .as_ref()
+        .map(uint8_array_to_vec);
+
+    match signal_protocol_core::x3dh_initiate(
         &alice_identity_private_bytes,
+        &alice_identity_public_bytes,
         &alice_ephemeral_private_bytes,
-        &bob_identity_public_bytes,
+        &bob_identity_x25519_public_bytes,
+        &bob_identity_ed25519_public_bytes,
         &bob_signed_prekey_public_bytes,
+        &bob_signed_prekey_signature_bytes,
         bob_one_time_prekey_opt.as_ref().map(|v| v.as_slice()),
     ) {
-        Ok(result) => {
+        Ok(core_result) => {
             log("X3DH initiation completed successfully");
-            Ok(result)
+            Ok(X3DHResult {
+                shared_secret: core_result.shared_secret,
+                associated_data: core_result.associated_data,
+            })
         }
         Err(e) => Err(JsValue::from_str(&e.to_string())),
     }
@@ -188,26 +178,27 @@ pub fn x3dh_initiate(
 #[wasm_bindgen]
 pub fn x3dh_respond(
     bob_identity_private: &Uint8Array,
+    bob_identity_public: &Uint8Array,
     bob_signed_prekey_private: &Uint8Array,
     bob_one_time_prekey_private: Option<Uint8Array>,
     alice_identity_public: &Uint8Array,
     alice_ephemeral_public: &Uint8Array,
 ) -> Result<X3DHResult, JsValue> {
     log("Responding to X3DH key exchange (Bob side)");
-    
-    // Convert JavaScript arrays to Rust vectors
+
     let bob_identity_private_bytes = uint8_array_to_vec(bob_identity_private);
+    let bob_identity_public_bytes  = uint8_array_to_vec(bob_identity_public);
     let bob_signed_prekey_private_bytes = uint8_array_to_vec(bob_signed_prekey_private);
     let alice_identity_public_bytes = uint8_array_to_vec(alice_identity_public);
     let alice_ephemeral_public_bytes = uint8_array_to_vec(alice_ephemeral_public);
-    
-    let bob_one_time_prekey_opt = bob_one_time_prekey_private.as_ref().map(|k| {
-        let bytes = uint8_array_to_vec(k);
-        bytes
-    });
-    
+
+    let bob_one_time_prekey_opt = bob_one_time_prekey_private
+        .as_ref()
+        .map(uint8_array_to_vec);
+
     match x3dh_respond_internal(
         &bob_identity_private_bytes,
+        &bob_identity_public_bytes,
         &bob_signed_prekey_private_bytes,
         bob_one_time_prekey_opt.as_ref().map(|v| v.as_slice()),
         &alice_identity_public_bytes,
@@ -225,8 +216,13 @@ pub fn x3dh_respond(
 #[allow(dead_code)]
 mod tests {
     use super::*;
+    use crate::rust::crypto::sign_data;
     use crate::rust::keys::*;
     use wasm_bindgen_test::*;
+
+    fn sign_spk(identity: &crate::rust::types::IdentityKeyPair, spk_pub: &js_sys::Uint8Array) -> js_sys::Uint8Array {
+        sign_data(&identity.ed25519().private_key(), spk_pub).unwrap()
+    }
 
     /// Test complete X3DH key exchange without one-time prekey
     #[wasm_bindgen_test]
@@ -238,19 +234,24 @@ mod tests {
         // Generate keys for Bob
         let bob_identity = generate_identity_keypair().unwrap();
         let bob_signed_prekey = generate_signed_prekey().unwrap();
+        let bob_spk_sig = sign_spk(&bob_identity, &bob_signed_prekey.public_key());
         
         // Alice initiates X3DH
         let alice_result = x3dh_initiate(
             &alice_identity.private_key(),
+            &alice_identity.public_key(),
             &alice_ephemeral.private_key(),
             &bob_identity.public_key(),
+            &bob_identity.ed25519().public_key(),
             &bob_signed_prekey.public_key(),
-            None
+            &bob_spk_sig,
+            None,
         ).unwrap();
-        
+
         // Bob responds to X3DH
         let bob_result = x3dh_respond(
             &bob_identity.private_key(),
+            &bob_identity.public_key(),
             &bob_signed_prekey.private_key(),
             None,
             &alice_identity.public_key(),
@@ -266,34 +267,34 @@ mod tests {
     /// Test complete X3DH key exchange with one-time prekey
     #[wasm_bindgen_test]
     fn test_x3dh_with_one_time_prekey() {
-        // Generate keys for Alice
         let alice_identity = generate_identity_keypair().unwrap();
         let alice_ephemeral = generate_ephemeral_keypair().unwrap();
-        
-        // Generate keys for Bob
+
         let bob_identity = generate_identity_keypair().unwrap();
         let bob_signed_prekey = generate_signed_prekey().unwrap();
         let bob_one_time_prekey = generate_one_time_prekey().unwrap();
-        
-        // Alice initiates X3DH with one-time prekey
+        let bob_spk_sig = sign_spk(&bob_identity, &bob_signed_prekey.public_key());
+
         let alice_result = x3dh_initiate(
             &alice_identity.private_key(),
+            &alice_identity.public_key(),
             &alice_ephemeral.private_key(),
             &bob_identity.public_key(),
+            &bob_identity.ed25519().public_key(),
             &bob_signed_prekey.public_key(),
+            &bob_spk_sig,
             Some(bob_one_time_prekey.public_key())
         ).unwrap();
-        
-        // Bob responds to X3DH with one-time prekey
+
         let bob_result = x3dh_respond(
             &bob_identity.private_key(),
+            &bob_identity.public_key(),
             &bob_signed_prekey.private_key(),
             Some(bob_one_time_prekey.private_key()),
             &alice_identity.public_key(),
             &alice_ephemeral.public_key()
         ).unwrap();
-        
-        // Both parties should derive the same shared secret
+
         assert_eq!(alice_result.shared_secret().to_vec(), bob_result.shared_secret().to_vec());
         assert_eq!(alice_result.shared_secret().length(), 32);
         assert_eq!(alice_result.associated_data().to_vec(), bob_result.associated_data().to_vec());
@@ -302,32 +303,38 @@ mod tests {
     /// Test that different key sets produce different shared secrets
     #[wasm_bindgen_test]
     fn test_x3dh_uniqueness() {
-        // First key exchange
         let alice_identity1 = generate_identity_keypair().unwrap();
         let alice_ephemeral1 = generate_ephemeral_keypair().unwrap();
         let bob_identity1 = generate_identity_keypair().unwrap();
         let bob_signed_prekey1 = generate_signed_prekey().unwrap();
-        
+        let bob_spk_sig1 = sign_spk(&bob_identity1, &bob_signed_prekey1.public_key());
+
         let result1 = x3dh_initiate(
             &alice_identity1.private_key(),
+            &alice_identity1.public_key(),
             &alice_ephemeral1.private_key(),
             &bob_identity1.public_key(),
+            &bob_identity1.ed25519().public_key(),
             &bob_signed_prekey1.public_key(),
-            None
+            &bob_spk_sig1,
+            None,
         ).unwrap();
-        
-        // Second key exchange with different keys
+
         let alice_identity2 = generate_identity_keypair().unwrap();
         let alice_ephemeral2 = generate_ephemeral_keypair().unwrap();
         let bob_identity2 = generate_identity_keypair().unwrap();
         let bob_signed_prekey2 = generate_signed_prekey().unwrap();
-        
+        let bob_spk_sig2 = sign_spk(&bob_identity2, &bob_signed_prekey2.public_key());
+
         let result2 = x3dh_initiate(
             &alice_identity2.private_key(),
+            &alice_identity2.public_key(),
             &alice_ephemeral2.private_key(),
             &bob_identity2.public_key(),
+            &bob_identity2.ed25519().public_key(),
             &bob_signed_prekey2.public_key(),
-            None
+            &bob_spk_sig2,
+            None,
         ).unwrap();
         
         // Different keys should produce different shared secrets

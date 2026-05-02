@@ -1,0 +1,117 @@
+(*****************************************************************
+ *
+ *  formal-proofs/proverif/x3dh_auth.pv
+ *
+ *  Companion to `x3dh.pv`. This model verifies mutual authentication
+ *  of the X3DH handshake under an active Dolev-Yao attacker but
+ *  WITHOUT phase-1 long-term-key corruption. The auth query
+ *  `inj-event(bob_finished) ==> inj-event(alice_finished)` is
+ *  intractable when combined with phase-1 corruption (ProVerif's
+ *  resolution does not terminate on the resulting Horn clauses);
+ *  splitting the proof into a secrecy-with-FS model and an
+ *  auth-without-corruption model is the standard ProVerif idiom for
+ *  Signal-style protocols.
+ *
+ *****************************************************************)
+
+type skey.
+type pkey.
+
+fun pk(skey): pkey.
+
+fun dh(skey, pkey): bitstring.
+equation forall a: skey, b: skey;
+  dh(a, pk(b)) = dh(b, pk(a)).
+
+fun sign(skey, bitstring): bitstring.
+reduc forall sk: skey, m: bitstring;
+  verify(pk(sk), sign(sk, m), m) = m.
+
+fun senc(bitstring, bitstring, bitstring): bitstring.
+reduc forall k: bitstring, m: bitstring, ad: bitstring;
+  sdec(k, senc(k, m, ad), ad) = m.
+
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
+fun concat(bitstring, bitstring): bitstring.
+
+fun pk_to_bs(pkey): bitstring [data, typeConverter].
+
+free x3dh_salt: bitstring.
+free x3dh_info: bitstring.
+free x3dh_F:    bitstring.
+free x3dh_aad:  bitstring.
+
+free c: channel.
+
+(* "I-am-here" tag Alice always sends as her first message under SK.
+   Bob's session is authenticated iff he successfully decrypts this
+   tag, because forging a ciphertext that decrypts to it under SK
+   without knowing SK is infeasible (under IND-CCA AEAD). *)
+free auth_tag: bitstring.
+
+(* Termination hint - same as in x3dh.pv. *)
+noselect b: skey; attacker(pk(b)).
+
+event alice_finished(pkey, pkey, bitstring).
+event bob_finished  (pkey, pkey, bitstring).
+
+(* Mutual authentication, injective form. Reads: every session in
+   which Bob believes he agreed on SK with party `a` corresponds to
+   a unique Alice session that also agreed on SK with `b`. *)
+query a: pkey, b: pkey, sk: bitstring;
+  inj-event(bob_finished(b, a, sk)) ==> inj-event(alice_finished(a, b, sk)).
+
+let processAlice(ik_a: skey, ik_b_pub: pkey) =
+  new ek_a: skey;
+  in(c, (spk_b_pub: pkey, spk_sig: bitstring, opk_b_pub: pkey));
+  let m_signed = verify(ik_b_pub, spk_sig, pk_to_bs(spk_b_pub)) in
+  let dh1 = dh(ik_a, spk_b_pub) in
+  let dh2 = dh(ek_a, ik_b_pub)  in
+  let dh3 = dh(ek_a, spk_b_pub) in
+  let dh4 = dh(ek_a, opk_b_pub) in
+  let kdf_in = concat(x3dh_F,
+                 concat(dh1, concat(dh2, concat(dh3, dh4)))) in
+  let sk_alice = hkdf(x3dh_salt, kdf_in, x3dh_info) in
+  event alice_finished(pk(ik_a), ik_b_pub, sk_alice);
+  out(c, (pk(ik_a), pk(ek_a)));
+  (* First message under SK: the unforgeable "I-am-here" tag.       *)
+  out(c, senc(sk_alice, auth_tag, x3dh_aad)).
+
+(* For the auth proof Bob is given the expected initiator identity
+   public key out-of-band (parameter `ik_a_pub`). This models the
+   real-Signal practice where both parties verify each other's safety
+   numbers (IK fingerprints) before treating the conversation as
+   authenticated. Without this, X3DH alone provides only deniable
+   authentication and the inj-event query is genuinely false. *)
+let processBob(ik_b: skey, ik_a_pub: pkey) =
+  new spk_b: skey;
+  new opk_b: skey;
+  let spk_pub = pk(spk_b) in
+  let opk_pub = pk(opk_b) in
+  let spk_sig = sign(ik_b, pk_to_bs(spk_pub)) in
+  out(c, (spk_pub, spk_sig, opk_pub));
+  in(c, (received_ik_a: pkey, ek_a_pub: pkey));
+  if received_ik_a = ik_a_pub then
+    let dh1 = dh(spk_b, ik_a_pub) in
+    let dh2 = dh(ik_b,  ek_a_pub) in
+    let dh3 = dh(spk_b, ek_a_pub) in
+    let dh4 = dh(opk_b, ek_a_pub) in
+    let kdf_in = concat(x3dh_F,
+                   concat(dh1, concat(dh2, concat(dh3, dh4)))) in
+    let sk_bob = hkdf(x3dh_salt, kdf_in, x3dh_info) in
+    (* Bob fires `bob_finished` only after successfully decrypting
+       Alice's `auth_tag` first-message under SK; this rules out
+       attacker-injected sessions, the SK of which would not match
+       any honest Alice's. *)
+    in(c, ct: bitstring);
+    let m = sdec(sk_bob, ct, x3dh_aad) in
+    if m = auth_tag then
+      event bob_finished(pk(ik_b), ik_a_pub, sk_bob).
+
+process
+  new ik_a: skey;
+  new ik_b: skey;
+  out(c, pk(ik_a));
+  out(c, pk(ik_b));
+  ((!processAlice(ik_a, pk(ik_b)))
+   | (!processBob(ik_b, pk(ik_a))))

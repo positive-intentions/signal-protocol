@@ -11,7 +11,7 @@ use web_sys::console;
 use sha2::Sha256;
 use hkdf::Hkdf;
 use crate::rust::crypto::uint8_array_to_vec;
-use crate::rust::types::KeyPair;
+use crate::rust::types::{IdentityKeyPair, KeyPair};
 
 /// Log messages to the browser console for debugging
 /// 
@@ -286,6 +286,13 @@ pub fn free_keypair(_keypair: &KeyPair) {
     // This function exists for API compatibility with other implementations
 }
 
+/// Optional explicit cleanup for an [`IdentityKeyPair`] (same semantics as
+/// [`free_keypair`]).
+#[wasm_bindgen]
+pub fn free_identity_keypair(_keypair: &IdentityKeyPair) {
+    log("IdentityKeyPair memory cleanup requested (automatic in Rust)");
+}
+
 /// Free memory associated with a buffer (placeholder for manual memory management)
 /// 
 /// Similar to `free_keypair`, this function exists for API compatibility.
@@ -414,7 +421,7 @@ mod tests {
         
         // Test keypair cleanup
         let keypair = generate_identity_keypair().unwrap();
-        free_keypair(&keypair); // Should not panic
+        free_identity_keypair(&keypair); // Should not panic
         
         // Test buffer cleanup
         let buffer = Uint8Array::from(&[1u8; 32][..]);

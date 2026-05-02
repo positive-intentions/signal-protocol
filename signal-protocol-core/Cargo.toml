@@ -3,27 +3,41 @@ name = "signal-protocol-core"
 version = "0.1.0"
 edition = "2021"
 description = "Signal Protocol core logic - no WASM, for formal verification with hax/F*"
-license = "MIT OR Apache-2.0"
+# License harmonised across all metadata files (Cargo.toml, package.json,
+# LICENSE) to GPL-3.0-only, matching the repository LICENSE file.
+license = "GPL-3.0-only"
 
 [lib]
 crate-type = ["lib"]
 
+# All dependency versions are pinned exactly (no `^` semver caret) so
+# that every CI run, every formal-verification run, and every
+# downstream build resolves to byte-identical dependency artifacts.
+# Bumping a dependency requires a deliberate edit here.
 [dependencies]
-x25519-dalek = { version = "2.0", features = ["static_secrets"], optional = true }
-ed25519-dalek = { version = "2.0", features = ["rand_core"], optional = true }
-sha2 = "0.10"
-hkdf = "0.12"
-aes-gcm = { version = "0.10", optional = true }
-rand = { version = "0.8", optional = true }
-rand_core = "0.6"
+x25519-dalek  = { version = "=2.0.1",  features = ["static_secrets"], optional = true }
+ed25519-dalek = { version = "=2.2.0",  features = ["rand_core"],      optional = true }
+sha2     = "=0.10.9"
+hkdf     = "=0.12.4"
+hmac     = "=0.12.1"
+aes-gcm  = { version = "=0.10.3", optional = true }
+rand     = { version = "=0.8.5",  optional = true }
+rand_core = "=0.6.4"
 
-thiserror = "1.0"
+# Constant-time comparisons for secret-equality checks
+subtle = { version = "=2.6.1", default-features = false }
 
-hex = "0.4"
+# Memory zeroization on Drop for secret-bearing buffers (chain keys,
+# message keys, root keys, DH private keys). Required so the
+# forward-secrecy assumption modelled in
+# `formal-proofs/proverif/double_ratchet.pv` (old chain keys are wiped
+# after the symmetric ratchet step) holds at the binary level.
+zeroize = { version = "=1.8.2", features = ["zeroize_derive"] }
 
-serde = { version = "1.0", features = ["derive"] }
-
-hax-lib = "0.3"
+thiserror = "=1.0.69"
+hex       = "=0.4.3"
+serde     = { version = "=1.0.228", features = ["derive"] }
+hax-lib   = "=0.3.6"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(hax_compilation)"] }

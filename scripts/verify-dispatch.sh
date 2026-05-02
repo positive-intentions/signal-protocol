@@ -2,7 +2,7 @@
 # Dispatches `npm run verify` to either the host toolchain or a Docker
 # container, depending on whether the required binaries are on $PATH.
 #
-# Override with VERIFY_MODE=host or VERIFY_MODE=docker.
+# Override with VERIFY_MODE=host, docker, skip, or auto.
 #
 # Host toolchain requires: opam + OCaml 5.1.1, F* (fstar.exe), Z3 4.13.3,
 # Rocq + coq-record-update, Lean 4 via elan, nightly Rust 2025-02-01, and
@@ -29,18 +29,22 @@ case "${mode}" in
   docker)
     exec npm run verify:docker
     ;;
+  skip)
+    echo "VERIFY_MODE=skip: skipping formal verification (F*/ProVerif/etc.)." >&2
+    exit 0
+    ;;
   auto)
     if has_host_toolchain; then
       echo "Host verification toolchain detected; running in-process."
       exec npm run verify:host
     else
       echo "Host verification toolchain not found (missing one of: fstar.exe, cargo-hax, elan)."
-      echo "Falling back to Docker. Override with VERIFY_MODE=host to force host mode."
+      echo "Falling back to Docker. Override with VERIFY_MODE=host to force host mode, or VERIFY_MODE=skip to skip."
       exec npm run verify:docker
     fi
     ;;
   *)
-    echo "Unknown VERIFY_MODE='${mode}'. Use 'host', 'docker', or 'auto'." >&2
+    echo "Unknown VERIFY_MODE='${mode}'. Use 'host', 'docker', 'skip', or 'auto'." >&2
     exit 2
     ;;
 esac

@@ -37,14 +37,14 @@ pub mod rust;
 // Re-export all public types and functions for JavaScript access
 pub use rust::{
     SignalError,
-    KeyPair, X3DHResult, EncryptionResult,
+    KeyPair, IdentityKeyPair, X3DHResult, EncryptionResult,
     generate_identity_keypair, generate_signed_prekey, 
     generate_one_time_prekey, generate_ephemeral_keypair,
     sign_data, verify_signature,
     x3dh_initiate, x3dh_respond,
     encrypt_message, decrypt_message,
     serialize_public_key, deserialize_public_key,
-    hkdf_derive_key, free_keypair, free_buffer
+    hkdf_derive_key, free_keypair, free_identity_keypair, free_buffer
 };
 
 

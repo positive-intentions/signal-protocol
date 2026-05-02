@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   test:
-    name: WASM tests (headless Chrome)
+    name: WASM tests (headless Firefox)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -28,16 +28,11 @@ jobs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      # GitHub-hosted ubuntu-latest runners ship with Chrome, but we pin a
-      # matching ChromeDriver via the dedicated action so there's no version
-      # skew with wasm-pack's own cached chromedriver (which has previously
-      # mismatched minor versions locally).
-      - uses: browser-actions/setup-chrome@v1
-        id: setup-chrome
-        with:
-          chrome-version: stable
-
-      - uses: nanasess/setup-chromedriver@v2
+      # Headless Firefox is more reliable than Chrome+wasm-pack in some
+      # environments (ChromeDriver killed / session 404). wasm-pack bundles
+      # geckodriver; we only need a Firefox binary on PATH.
+      - name: Install Firefox
+        run: sudo apt-get update && sudo apt-get install -y firefox
 
       - uses: actions/setup-node@v4
         with:
@@ -48,6 +43,4 @@ jobs:
         run: npm ci
 
       - name: Run wasm-pack browser tests
-        env:
-          CHROME_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
         run: npm run test:wasm

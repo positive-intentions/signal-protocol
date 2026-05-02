@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   verify:
-    name: F* formal verification
+    name: F* formal verification (full, including Double Ratchet)
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -22,10 +22,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Shared cache scope (`verify`) is reused by the sibling verify-rocq,
-      # verify-lean and verify-proverif workflows so the expensive
-      # opam/F*/hax install layers only need to be built once across all
-      # verifier workflows on a given branch.
+      # Shared cache scope (`verify`) is reused by verify-proverif and
+      # other verifier workflows so the expensive opam/F*/hax install
+      # layers only need to be built once across jobs on a given branch.
       - name: Build verification image (GHA-cached)
         uses: docker/build-push-action@v5
         with:
@@ -44,10 +43,19 @@ jobs:
             -w /app \
             signal-protocol-verify-runner:latest \
             bash -lc '
+              # Hax-upstream is pinned via hax-upstream.commit at the
+              # repo root. The CI clones that exact commit so a hax
+              # release that breaks extraction does not silently land.
               if [ ! -d hax-upstream/hax-lib ]; then
-                echo "Cloning hax-upstream (hacspec/hax) for proof libraries..."
-                git clone --depth=1 https://github.com/hacspec/hax.git hax-upstream
+                COMMIT="$(cat hax-upstream.commit | tr -d "[:space:]")"
+                echo "Cloning hacspec/hax pinned to $COMMIT..."
+                git clone https://github.com/hacspec/hax.git hax-upstream
+                ( cd hax-upstream && git checkout --detach "$COMMIT" )
               fi
               eval "$(opam env)"
-              npm run verify:fstar:lite
+              # Full verification - includes Double_ratchet. The
+              # plan replaces the previous --lite default; if the
+              # full target hangs, the per-module timeout in the
+              # Makefile bounds CI runtime.
+              npm run verify:fstar
             '

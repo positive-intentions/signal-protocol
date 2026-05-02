@@ -15,6 +15,9 @@
   ],
   "include_dirs": [
     ".",
+    "../spec",
+    "../security",
+    "../stubs",
     "${HACL_HOME}/lib",
     "${HAX_HOME}/proof-libs/fstar/rust_primitives",
     "${HAX_HOME}/proof-libs/fstar/core",

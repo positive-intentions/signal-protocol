@@ -213,6 +213,12 @@ describe("WASM Wrapper Functions Coverage", () => {
   });
 
   describe("X3DH Wrappers", () => {
+    /** SPK signature over SPK public key bytes, using Bob's Ed25519 identity key. */
+    function signSpkSig(wasm, bobIdentity, spkPublicKey) {
+      const ed = bobIdentity.ed25519();
+      return wasm.sign_data(ed.private_key, spkPublicKey);
+    }
+
     test("x3dh_initiate wrapper", () => {
       expect(wasmAvailable).toBe(true);
 
@@ -221,12 +227,16 @@ describe("WASM Wrapper Functions Coverage", () => {
       const bobIdentity = wasmModule.generate_identity_keypair();
       const bobSignedPrekey = wasmModule.generate_signed_prekey();
       const bobOneTimePrekey = wasmModule.generate_one_time_prekey();
+      const spkSig = signSpkSig(wasmModule, bobIdentity, bobSignedPrekey.public_key);
 
       const result = wasmModule.x3dh_initiate(
         aliceIdentity.private_key,
+        aliceIdentity.public_key,
         aliceEphemeral.private_key,
         bobIdentity.public_key,
+        bobIdentity.ed25519().public_key,
         bobSignedPrekey.public_key,
+        spkSig,
         bobOneTimePrekey.public_key,
       );
 
@@ -244,12 +254,16 @@ describe("WASM Wrapper Functions Coverage", () => {
       const aliceEphemeral = wasmModule.generate_ephemeral_keypair();
       const bobIdentity = wasmModule.generate_identity_keypair();
       const bobSignedPrekey = wasmModule.generate_signed_prekey();
+      const spkSig = signSpkSig(wasmModule, bobIdentity, bobSignedPrekey.public_key);
 
       const result = wasmModule.x3dh_initiate(
         aliceIdentity.private_key,
+        aliceIdentity.public_key,
         aliceEphemeral.private_key,
         bobIdentity.public_key,
+        bobIdentity.ed25519().public_key,
         bobSignedPrekey.public_key,
+        spkSig,
         null,
       );
 
@@ -269,6 +283,7 @@ describe("WASM Wrapper Functions Coverage", () => {
 
       const result = wasmModule.x3dh_respond(
         bobIdentity.private_key,
+        bobIdentity.public_key,
         bobSignedPrekey.private_key,
         bobOneTimePrekey.private_key,
         aliceIdentity.public_key,
@@ -290,6 +305,7 @@ describe("WASM Wrapper Functions Coverage", () => {
 
       const result = wasmModule.x3dh_respond(
         bobIdentity.private_key,
+        bobIdentity.public_key,
         bobSignedPrekey.private_key,
         null,
         aliceIdentity.public_key,
@@ -308,12 +324,16 @@ describe("WASM Wrapper Functions Coverage", () => {
       const aliceEphemeral = wasmModule.generate_ephemeral_keypair();
       const bobIdentity = wasmModule.generate_identity_keypair();
       const bobSignedPrekey = wasmModule.generate_signed_prekey();
+      const spkSig = signSpkSig(wasmModule, bobIdentity, bobSignedPrekey.public_key);
 
       const result = wasmModule.x3dh_initiate(
         aliceIdentity.private_key,
+        aliceIdentity.public_key,
         aliceEphemeral.private_key,
         bobIdentity.public_key,
+        bobIdentity.ed25519().public_key,
         bobSignedPrekey.public_key,
+        spkSig,
         null,
       );
 

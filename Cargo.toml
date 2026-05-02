@@ -3,44 +3,53 @@ name = "signal-protocol-wasm"
 version = "0.1.0"
 edition = "2021"
 description = "Signal Protocol implementation in Rust compiled to WebAssembly"
-license = "MIT OR Apache-2.0"
+# License harmonised across all metadata files (Cargo.toml, package.json,
+# LICENSE) to GPL-3.0-only, matching the repository LICENSE file.
+license = "GPL-3.0-only"
+# Published only as a WASM artifact; never as a crates.io crate. This
+# both reflects reality and lets the workspace path dependency on
+# signal-protocol-core pass the cargo-deny wildcard check.
+publish = false
 
 [lib]
 crate-type = ["cdylib"]
 
+# All dependency versions are pinned exactly (no `^` semver caret) so
+# every CI run resolves to byte-identical dependency artifacts.
+# Bumping a dependency requires a deliberate edit here.
 [dependencies]
 signal-protocol-core = { path = "signal-protocol-core" }
-wasm-bindgen = "0.2"
-js-sys = "0.3"
-web-sys = { version = "0.3", features = ["console"] }
-getrandom = { version = "0.2", features = ["js"] }
-console_error_panic_hook = "0.1"
+wasm-bindgen   = "=0.2.100"
+js-sys         = "=0.3.77"
+web-sys        = { version = "=0.3.77", features = ["console"] }
+getrandom      = { version = "=0.2.16", features = ["js"] }
+console_error_panic_hook = "=0.1.7"
 
 # Real cryptography for production use
-x25519-dalek = { version = "2.0", features = ["static_secrets"] }
-ed25519-dalek = { version = "2.0", features = ["rand_core"] }
-curve25519-dalek = "4.0"
-sha2 = "0.10"
-hkdf = "0.12"
-aes-gcm = "0.10"
-rand = "0.8"
-rand_core = "0.6"
+x25519-dalek      = { version = "=2.0.1",  features = ["static_secrets"] }
+ed25519-dalek     = { version = "=2.2.0",  features = ["rand_core"] }
+curve25519-dalek  = "=4.1.3"
+sha2     = "=0.10.9"
+hkdf     = "=0.12.4"
+aes-gcm  = "=0.10.3"
+rand     = "=0.8.5"
+rand_core = "=0.6.4"
 
 # Constant-time operations for security
-subtle = "2.5"
+subtle = "=2.6.1"
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "=1.0.228", features = ["derive"] }
 
 # Error handling
-thiserror = "1.0"
+thiserror = "=1.0.69"
 
 # Hex encoding (for non-sensitive data only)
-hex = "0.4"
+hex = "=0.4.3"
 
 # Development dependencies for testing and coverage
 [dev-dependencies]
-wasm-bindgen-test = "0.3"
+wasm-bindgen-test = "=0.3.50"
 
 # Enable optimizations for WASM build
 [profile.release]

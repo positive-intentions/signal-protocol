@@ -68,6 +68,7 @@ describe("WASM Module Structure and Build Validation", () => {
       "serialize_public_key",
       "deserialize_public_key",
       "free_keypair",
+      "free_identity_keypair",
       "free_buffer",
     ];
 
@@ -81,7 +82,7 @@ describe("WASM Module Structure and Build Validation", () => {
     const jsContent = fs.readFileSync(jsFile, "utf8");
 
     // Check that all expected classes are exported
-    const expectedClasses = ["KeyPair", "X3DHResult", "EncryptionResult"];
+    const expectedClasses = ["KeyPair", "IdentityKeyPair", "X3DHResult", "EncryptionResult"];
 
     expectedClasses.forEach((className) => {
       expect(jsContent).toContain(`export class ${className}`);
@@ -125,6 +126,7 @@ describe("WASM Module Structure and Build Validation", () => {
 
     // Check for key type definitions
     expect(dtsContent).toContain("export class KeyPair");
+    expect(dtsContent).toContain("export class IdentityKeyPair");
     expect(dtsContent).toContain("export class X3DHResult");
     expect(dtsContent).toContain("export class EncryptionResult");
 
@@ -208,7 +210,7 @@ describe("WASM Module Structure and Build Validation", () => {
       const dtsContent = fs.readFileSync(dtsFile, "utf8");
 
       // Key generation functions should return KeyPair
-      expect(dtsContent).toContain("generate_identity_keypair(): KeyPair");
+      expect(dtsContent).toContain("generate_identity_keypair(): IdentityKeyPair");
       expect(dtsContent).toContain("generate_signed_prekey(): KeyPair");
 
       // X3DH functions should return X3DHResult

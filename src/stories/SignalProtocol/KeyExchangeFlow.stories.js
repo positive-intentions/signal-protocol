@@ -207,6 +207,7 @@ const KeyExchangeFlowDemo = () => {
 
           const bobSecretResult = await wasmInstance.x3dhRespond(
             bob.identityKeyPair.privateKey,
+            bob.identityKeyPair.publicKey,
             bob.signedPrekeyPair.privateKey,
             bobOneTimePrekeyPrivate,
             alice.identityKeyPair.publicKey,

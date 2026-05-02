@@ -4,6 +4,8 @@
 //! implementation. All types are designed to work seamlessly with WebAssembly
 //! and provide efficient JavaScript interoperability.
 
+use std::fmt;
+
 use wasm_bindgen::prelude::*;
 use js_sys::Uint8Array;
 use serde::{Serialize, Deserialize};
@@ -18,7 +20,7 @@ use serde::{Serialize, Deserialize};
 /// Private keys should be handled with extreme care and never exposed
 /// in logs or transmitted over insecure channels.
 #[wasm_bindgen]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct KeyPair {
     /// Public key bytes - safe to share with other parties
     #[wasm_bindgen(skip)]
@@ -50,6 +52,67 @@ impl KeyPair {
     }
 }
 
+impl fmt::Debug for KeyPair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("KeyPair(/* redacted */)")
+    }
+}
+
+/// Long-term identity: X25519 (DH) and Ed25519 (signing the signed prekey).
+/// [`public_key`] / [`private_key`] refer to the **X25519** half for
+/// backward compatibility with older WASM code.
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct IdentityKeyPair {
+    #[wasm_bindgen(skip)]
+    kp_x25519: KeyPair,
+    #[wasm_bindgen(skip)]
+    kp_ed25519: KeyPair,
+}
+
+#[wasm_bindgen]
+impl IdentityKeyPair {
+    pub(crate) fn from_core(pair: signal_protocol_core::IdentityKeyPair) -> Self {
+        Self {
+            kp_x25519: KeyPair {
+                public_key: pair.x25519.public_key,
+                private_key: pair.x25519.private_key,
+            },
+            kp_ed25519: KeyPair {
+                public_key: pair.ed25519.public_key,
+                private_key: pair.ed25519.private_key,
+            },
+        }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn public_key(&self) -> Uint8Array {
+        self.kp_x25519.public_key()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn private_key(&self) -> Uint8Array {
+        self.kp_x25519.private_key()
+    }
+
+    #[wasm_bindgen]
+    pub fn x25519(&self) -> KeyPair {
+        self.kp_x25519.clone()
+    }
+
+    #[wasm_bindgen]
+    pub fn ed25519(&self) -> KeyPair {
+        self.kp_ed25519.clone()
+    }
+}
+
+impl fmt::Debug for IdentityKeyPair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("IdentityKeyPair(/* redacted */)")
+    }
+}
+
+
 /// Result of X3DH key exchange protocol
 /// 
 /// Contains the shared secret and associated data produced by the X3DH
@@ -60,7 +123,7 @@ impl KeyPair {
 /// The Extended Triple Diffie-Hellman (X3DH) is Signal's key agreement
 /// protocol that provides mutual authentication and forward secrecy.
 #[wasm_bindgen]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct X3DHResult {
     /// The derived shared secret for secure communication
     /// This secret is used to derive message encryption keys
@@ -94,6 +157,12 @@ impl X3DHResult {
     }
 }
 
+impl fmt::Debug for X3DHResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("X3DHResult(/* redacted */)")
+    }
+}
+
 /// Result of message encryption operation
 /// 
 /// Contains both the encrypted ciphertext and the derived message key.
@@ -104,7 +173,7 @@ impl X3DHResult {
 /// Each message uses a unique derived key, ensuring that compromise
 /// of one message key doesn't affect the security of other messages.
 #[wasm_bindgen]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct EncryptionResult {
     /// The encrypted message data with authentication tag
     /// Includes the AES-GCM nonce prepended to the ciphertext
@@ -135,5 +204,11 @@ impl EncryptionResult {
     #[wasm_bindgen(getter)]
     pub fn message_key(&self) -> Uint8Array {
         Uint8Array::from(&self.message_key[..])
+    }
+}
+
+impl fmt::Debug for EncryptionResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("EncryptionResult(/* redacted */)")
     }
 }

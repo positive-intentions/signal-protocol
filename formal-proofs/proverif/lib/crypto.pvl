@@ -1,0 +1,83 @@
+(*****************************************************************
+ *
+ *  formal-proofs/proverif/lib/crypto.pvl
+ *
+ *  Shared cryptographic library for the Signal Protocol ProVerif
+ *  models (X3DH, Double Ratchet, end-to-end composition).
+ *
+ *  All function symbols and equational theories live here so the
+ *  per-protocol models stay focused on the message flow.
+ *
+ *  Threat model: standard Dolev-Yao active attacker on every public
+ *  channel. The attacker sees all public keys, can intercept and
+ *  inject any message on `c`, and can compromise corrupt parties at
+ *  any point (modelled with `phase`).
+ *
+ *  Conventions:
+ *    skey   - private (signing or DH) key
+ *    pkey   - corresponding public key  
+ *    `pk(s)` returns the public key from a private key
+ *    `dh(s, p)` is X25519 with the equational `dh(a, pk(b)) = dh(b, pk(a))`
+ *    `sign / verify` is Ed25519 with correctness equation
+ *    `senc / sdec` is AEAD with `sdec(k, senc(k,m,ad), ad) = m`
+ *
+ *****************************************************************)
+
+(* === Types === *)
+
+type skey.
+type pkey.
+
+(* === Public-key derivation === *)
+
+fun pk(skey): pkey.
+
+(* === Diffie-Hellman with commutativity === *)
+
+fun dh(skey, pkey): bitstring.
+
+equation forall a: skey, b: skey;
+  dh(a, pk(b)) = dh(b, pk(a)).
+
+(* === Ed25519 signatures === *)
+
+fun sign(skey, bitstring): bitstring.
+fun verify(pkey, bitstring, bitstring): bool
+  reduc forall sk: skey, m: bitstring; verify(pk(sk), sign(sk, m), m) = true.
+
+(* === Symmetric AEAD (AES-256-GCM model) ===
+   senc takes (key, plaintext, aad) and produces ciphertext;
+   sdec takes (key, ciphertext, aad) and recovers plaintext when the
+   key/aad pair matches, otherwise fails. *)
+
+fun senc(bitstring, bitstring, bitstring): bitstring.
+reduc forall k: bitstring, m: bitstring, ad: bitstring;
+  sdec(k, senc(k, m, ad), ad) = m.
+
+(* === KDFs ===
+   `hkdf(salt, ikm, info)` is HKDF-SHA-256 modelled as a free
+   constructor (one-way pseudo-random function in the symbolic model).
+   `hmac(key, data)` is HMAC-SHA-256 used by KDF_CK with the
+   single-byte inputs 0x01 / 0x02 below. *)
+
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
+fun hmac(bitstring, bitstring): bitstring.
+
+(* === Whitepaper constants ===
+   These free names are public (the attacker can use them) but they
+   remain unique constants so that domain separation is preserved in
+   the symbolic model. *)
+
+free x3dh_salt: bitstring.
+free x3dh_info: bitstring.
+free x3dh_F:    bitstring.   (* F = 0xFF^32 from X3DH §3.3 step 3.   *)
+free dr_info:   bitstring.   (* "Signal_DH_Ratchet" - HKDF info.     *)
+free dr_byte01: bitstring.   (* 0x01 - HMAC input for message_key.   *)
+free dr_byte02: bitstring.   (* 0x02 - HMAC input for next chain_key.*)
+
+(* === Bytestring helpers ===
+   Concatenation is associative and unique in the symbolic model;
+   `concat` here is opaque to the attacker except when they know all
+   parts. *)
+
+fun concat(bitstring, bitstring): bitstring.

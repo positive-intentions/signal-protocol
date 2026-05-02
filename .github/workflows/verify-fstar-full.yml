@@ -2,9 +2,9 @@ name: Verify F* (full)
 
 on:
   push:
-    branches: [feat/updating-testing-scripts]
+    branches: [staging]
   pull_request:
-    branches: [feat/updating-testing-scripts]
+    branches: [staging]
   workflow_dispatch:
 
 concurrency:
@@ -22,8 +22,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Reuses the same `verify` GHA cache scope as verify-fstar.yml and
-      # other verifier workflows so the verification image layers stay warm.
+      # Reuses the same `verify` GHA cache scope as verify-fstar.yml
+      # and other verifier workflows so the verification image layers
+      # stay warm.
       - name: Build verification image (GHA-cached)
         uses: docker/build-push-action@v5
         with:
@@ -43,8 +44,10 @@ jobs:
             signal-protocol-verify-runner:latest \
             bash -lc '
               if [ ! -d hax-upstream/hax-lib ]; then
-                echo "Cloning hax-upstream (hacspec/hax) for proof libraries..."
-                git clone --depth=1 https://github.com/hacspec/hax.git hax-upstream
+                COMMIT="$(cat hax-upstream.commit | tr -d "[:space:]")"
+                echo "Cloning hacspec/hax pinned to $COMMIT..."
+                git clone https://github.com/hacspec/hax.git hax-upstream
+                ( cd hax-upstream && git checkout --detach "$COMMIT" )
               fi
               eval "$(opam env)"
               npm run verify:fstar

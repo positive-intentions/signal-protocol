@@ -43,6 +43,8 @@ const mockWasmImplementation = {
     return {
       publicKey: new Uint8Array(32).fill(Math.floor(Math.random() * 256)),
       privateKey: new Uint8Array(32).fill(Math.floor(Math.random() * 256)),
+      ed25519PublicKey: new Uint8Array(32).fill(Math.floor(Math.random() * 256)),
+      ed25519PrivateKey: new Uint8Array(32).fill(Math.floor(Math.random() * 256)),
     };
   },
 
@@ -81,10 +83,13 @@ const mockWasmImplementation = {
   },
 
   async x3dhInitiate(
-    aliceIdentityPrivate,
-    aliceEphemeralPrivate,
-    bobIdentityPublic,
-    bobSignedPrekeyPublic,
+    _aliceIdentityPrivate,
+    _aliceIdentityPublic,
+    _aliceEphemeralPrivate,
+    _bobIdentityX25519Public,
+    _bobIdentityEd25519Public,
+    _bobSignedPrekeyPublic,
+    _bobSignedPrekeySignature,
     bobOneTimePrekeyPublic,
   ) {
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -96,11 +101,12 @@ const mockWasmImplementation = {
   },
 
   async x3dhRespond(
-    bobIdentityPrivate,
-    bobSignedPrekeyPrivate,
+    _bobIdentityPrivate,
+    _bobIdentityPublic,
+    _bobSignedPrekeyPrivate,
     bobOneTimePrekeyPrivate,
-    aliceIdentityPublic,
-    aliceEphemeralPublic,
+    _aliceIdentityPublic,
+    _aliceEphemeralPublic,
   ) {
     await new Promise((resolve) => setTimeout(resolve, 95));
     return {
@@ -201,9 +207,12 @@ const SignalProtocolWasmDemo = () => {
       const wasmWrapper = {
         async generateIdentityKeyPair() {
           const result = wasmModule.generate_identity_keypair();
+          const ed = result.ed25519();
           return {
             publicKey: result.public_key,
             privateKey: result.private_key,
+            ed25519PublicKey: ed.public_key,
+            ed25519PrivateKey: ed.private_key,
           };
         },
 
@@ -241,27 +250,34 @@ const SignalProtocolWasmDemo = () => {
 
         async x3dhInitiate(
           aliceIdentityPrivate,
+          aliceIdentityPublic,
           aliceEphemeralPrivate,
-          bobIdentityPublic,
+          bobIdentityX25519Public,
+          bobIdentityEd25519Public,
           bobSignedPrekeyPublic,
+          bobSignedPrekeySignature,
           bobOneTimePrekeyPublic,
         ) {
           const result = wasmModule.x3dh_initiate(
             aliceIdentityPrivate,
+            aliceIdentityPublic,
             aliceEphemeralPrivate,
-            bobIdentityPublic,
+            bobIdentityX25519Public,
+            bobIdentityEd25519Public,
             bobSignedPrekeyPublic,
-            bobOneTimePrekeyPublic,
+            bobSignedPrekeySignature,
+            bobOneTimePrekeyPublic ?? null,
           );
           return {
             sharedSecret: result.shared_secret,
             associatedData: result.associated_data,
-            usedOneTimePrekey: bobOneTimePrekeyPublic !== null,
+            usedOneTimePrekey: bobOneTimePrekeyPublic != null,
           };
         },
 
         async x3dhRespond(
           bobIdentityPrivate,
+          bobIdentityPublic,
           bobSignedPrekeyPrivate,
           bobOneTimePrekeyPrivate,
           aliceIdentityPublic,
@@ -269,6 +285,7 @@ const SignalProtocolWasmDemo = () => {
         ) {
           const result = wasmModule.x3dh_respond(
             bobIdentityPrivate,
+            bobIdentityPublic,
             bobSignedPrekeyPrivate,
             bobOneTimePrekeyPrivate,
             aliceIdentityPublic,
@@ -277,7 +294,7 @@ const SignalProtocolWasmDemo = () => {
           return {
             sharedSecret: result.shared_secret,
             associatedData: result.associated_data,
-            usedOneTimePrekey: bobOneTimePrekeyPrivate !== null,
+            usedOneTimePrekey: bobOneTimePrekeyPrivate != null,
           };
         },
 
@@ -378,7 +395,7 @@ const SignalProtocolWasmDemo = () => {
       // Create signature
       console.log("✍️ Step 6: Creating signature...");
       const signedPrekeySignature = await wasmInstance.signData(
-        bobIdentity.privateKey,
+        bobIdentity.ed25519PrivateKey,
         bobSignedPrekey.publicKey,
       );
       console.log(
@@ -390,9 +407,12 @@ const SignalProtocolWasmDemo = () => {
       console.log("🤝 Step 7: Alice initiating X3DH...");
       const aliceResult = await wasmInstance.x3dhInitiate(
         aliceIdentity.privateKey,
+        aliceIdentity.publicKey,
         aliceEphemeral.privateKey,
         bobIdentity.publicKey,
+        bobIdentity.ed25519PublicKey,
         bobSignedPrekey.publicKey,
+        signedPrekeySignature,
         bobOneTimePrekey.publicKey,
       );
       console.log("✅ Alice X3DH result:", aliceResult);
@@ -400,6 +420,7 @@ const SignalProtocolWasmDemo = () => {
       console.log("🤝 Step 8: Bob responding to X3DH...");
       const bobResult = await wasmInstance.x3dhRespond(
         bobIdentity.privateKey,
+        bobIdentity.publicKey,
         bobSignedPrekey.privateKey,
         bobOneTimePrekey.privateKey,
         aliceIdentity.publicKey,
@@ -536,7 +557,7 @@ const SignalProtocolWasmDemo = () => {
     const testData = new TextEncoder().encode("benchmark test data");
     start = performance.now();
     for (let i = 0; i < iterations; i++) {
-      await wasmInstance.signData(testKey.privateKey, testData);
+      await wasmInstance.signData(testKey.ed25519PrivateKey, testData);
     }
     benchmarks.signing.wasm = (performance.now() - start) / iterations;
 
@@ -547,11 +568,18 @@ const SignalProtocolWasmDemo = () => {
       const bob = await wasmInstance.generateIdentityKeyPair();
       const ephemeral = await wasmInstance.generateEphemeralKeyPair();
       const prekey = await wasmInstance.generateSignedPrekey();
+      const spkSig = await wasmInstance.signData(
+        bob.ed25519PrivateKey,
+        prekey.publicKey,
+      );
       await wasmInstance.x3dhInitiate(
         alice.privateKey,
+        alice.publicKey,
         ephemeral.privateKey,
         bob.publicKey,
+        bob.ed25519PublicKey,
         prekey.publicKey,
+        spkSig,
         null,
       );
     }
@@ -1166,9 +1194,12 @@ const PerformanceFocusDemo = () => {
       const wasmWrapper = {
         async generateIdentityKeyPair() {
           const result = wasmModule.generate_identity_keypair();
+          const ed = result.ed25519();
           return {
             publicKey: result.public_key,
             privateKey: result.private_key,
+            ed25519PublicKey: ed.public_key,
+            ed25519PrivateKey: ed.private_key,
           };
         },
         async generateSignedPrekey() {
@@ -1190,17 +1221,23 @@ const PerformanceFocusDemo = () => {
         },
         async x3dhInitiate(
           aliceIdentityPrivate,
+          aliceIdentityPublic,
           aliceEphemeralPrivate,
-          bobIdentityPublic,
+          bobIdentityX25519Public,
+          bobIdentityEd25519Public,
           bobSignedPrekeyPublic,
+          bobSignedPrekeySignature,
           bobOneTimePrekeyPublic,
         ) {
           const result = wasmModule.x3dh_initiate(
             aliceIdentityPrivate,
+            aliceIdentityPublic,
             aliceEphemeralPrivate,
-            bobIdentityPublic,
+            bobIdentityX25519Public,
+            bobIdentityEd25519Public,
             bobSignedPrekeyPublic,
-            bobOneTimePrekeyPublic,
+            bobSignedPrekeySignature,
+            bobOneTimePrekeyPublic ?? null,
           );
           return {
             sharedSecret: result.shared_secret,
@@ -1293,7 +1330,7 @@ const PerformanceFocusDemo = () => {
       );
       start = performance.now();
       for (let i = 0; i < iterations; i++) {
-        await wasmInstance.signData(testKey.privateKey, testData);
+        await wasmInstance.signData(testKey.ed25519PrivateKey, testData);
       }
       benchmarkResults.signing.wasm = (performance.now() - start) / iterations;
 
@@ -1304,11 +1341,18 @@ const PerformanceFocusDemo = () => {
         const bob = await wasmInstance.generateIdentityKeyPair();
         const ephemeral = await wasmInstance.generateEphemeralKeyPair();
         const prekey = await wasmInstance.generateSignedPrekey();
+        const spkSig = await wasmInstance.signData(
+          bob.ed25519PrivateKey,
+          prekey.publicKey,
+        );
         await wasmInstance.x3dhInitiate(
           alice.privateKey,
+          alice.publicKey,
           ephemeral.privateKey,
           bob.publicKey,
+          bob.ed25519PublicKey,
           prekey.publicKey,
+          spkSig,
           null,
         );
       }

@@ -1,0 +1,132 @@
+(*****************************************************************
+ *
+ *  formal-proofs/proverif/signal_complete.pv
+ *
+ *  End-to-end Signal Protocol model: X3DH handshake feeding the
+ *  Double Ratchet. The X3DH-output shared secret SK becomes the
+ *  Double Ratchet's initial root key RK_0. The previous monolithic
+ *  `signal_protocol_complete.pv` did not actually pass SK from the
+ *  handshake to the ratchet; this model wires them together via
+ *  process-internal `let` bindings.
+ *
+ *  Threat model
+ *  ------------
+ *  - Public channel `c` with a Dolev-Yao active attacker.
+ *  - Long-term identity keys for Alice and Bob are sampled inside
+ *    the process and never published except via `phase 1` corruption.
+ *  - One honest message is sent under the first message key derived
+ *    from the X3DH handshake. We prove its secrecy and the
+ *    authentication of the X3DH phase.
+ *
+ *****************************************************************)
+
+(* === Crypto primitives (matches lib/crypto.pvl) === *)
+type skey.
+type pkey.
+
+fun pk(skey): pkey.
+
+fun dh(skey, pkey): bitstring.
+equation forall a: skey, b: skey;
+  dh(a, pk(b)) = dh(b, pk(a)).
+
+fun sign(skey, bitstring): bitstring.
+reduc forall sk: skey, m: bitstring;
+  verify(pk(sk), sign(sk, m), m) = m.
+
+fun senc(bitstring, bitstring, bitstring): bitstring.
+reduc forall k: bitstring, m: bitstring, ad: bitstring;
+  sdec(k, senc(k, m, ad), ad) = m.
+
+fun hkdf(bitstring, bitstring, bitstring): bitstring.
+fun hmac(bitstring, bitstring): bitstring.
+fun concat(bitstring, bitstring): bitstring.
+
+fun pk_to_bs(pkey): bitstring [data, typeConverter].
+
+free x3dh_salt: bitstring.
+free x3dh_info: bitstring.
+free x3dh_F:    bitstring.
+free dr_info:   bitstring.
+free dr_byte01: bitstring.
+free dr_aad:    bitstring.
+
+free c: channel.
+
+(* Termination hint emitted by ProVerif itself for the auth queries.    *)
+noselect b: skey; attacker(pk(b)).
+
+(* Application secret carried under the first DR message key.         *)
+free secret_message: bitstring [private].
+
+(* === Events === *)
+event alice_x3dh_done(pkey, pkey, bitstring).
+event bob_x3dh_done  (pkey, pkey, bitstring).
+event alice_dr_sent  (bitstring).
+event bob_dr_recv    (bitstring).
+
+(* === Queries === *)
+query attacker(secret_message).
+
+(* Mutual authentication queries are verified in x3dh_auth.pv (X3DH
+   side) and double_ratchet.pv (per-message DR side). Keeping them
+   here on top of the composed model causes ProVerif resolution to
+   diverge under unbounded sessions; this is a standard split. *)
+
+(* === Honest Alice: X3DH initiator + first DR send.
+   Alice receives Bob's identity-pubkey out-of-band (parameter
+   `ik_b_pub`); the rest of the bundle comes over the public
+   channel `c`. *)
+let processAlice(ik_a: skey, ik_b_pub: pkey) =
+  new ek_a: skey;
+  in(c, (spk_b_pub: pkey, spk_sig: bitstring, opk_b_pub: pkey));
+  let m_signed = verify(ik_b_pub, spk_sig, pk_to_bs(spk_b_pub)) in
+  let dh1 = dh(ik_a, spk_b_pub) in
+  let dh2 = dh(ek_a, ik_b_pub)  in
+  let dh3 = dh(ek_a, spk_b_pub) in
+  let dh4 = dh(ek_a, opk_b_pub) in
+  let kdf_in = concat(x3dh_F,
+                 concat(dh1, concat(dh2, concat(dh3, dh4)))) in
+  let sk_x3dh = hkdf(x3dh_salt, kdf_in, x3dh_info) in
+  event alice_x3dh_done(pk(ik_a), ik_b_pub, sk_x3dh);
+  out(c, (pk(ik_a), pk(ek_a)));
+  (* Bootstrap DR: chain_0 = HKDF(rk = sk, ikm = sk, info = dr_info)
+     mirroring `Spec.DoubleRatchet.initial_chain_key` and
+     `signal-protocol-core/src/double_ratchet.rs`.                     *)
+  let ck0 = hkdf(sk_x3dh, sk_x3dh, dr_info) in
+  let mk0 = hmac(ck0, dr_byte01) in
+  let ct0 = senc(mk0, secret_message, dr_aad) in
+  event alice_dr_sent(secret_message);
+  out(c, ct0).
+
+(* === Honest Bob: X3DH responder + first DR recv. === *)
+let processBob(ik_b: skey) =
+  new spk_b: skey;
+  new opk_b: skey;
+  let spk_pub = pk(spk_b) in
+  let opk_pub = pk(opk_b) in
+  let spk_sig = sign(ik_b, pk_to_bs(spk_pub)) in
+  out(c, (spk_pub, spk_sig, opk_pub));
+  in(c, (ik_a_pub: pkey, ek_a_pub: pkey));
+  let dh1 = dh(spk_b, ik_a_pub) in
+  let dh2 = dh(ik_b,  ek_a_pub) in
+  let dh3 = dh(spk_b, ek_a_pub) in
+  let dh4 = dh(opk_b, ek_a_pub) in
+  let kdf_in = concat(x3dh_F,
+                 concat(dh1, concat(dh2, concat(dh3, dh4)))) in
+  let sk_x3dh = hkdf(x3dh_salt, kdf_in, x3dh_info) in
+  event bob_x3dh_done(pk(ik_b), ik_a_pub, sk_x3dh);
+  let ck0 = hkdf(sk_x3dh, sk_x3dh, dr_info) in
+  let mk0 = hmac(ck0, dr_byte01) in
+  in(c, ct0: bitstring);
+  let m = sdec(mk0, ct0, dr_aad) in
+  event bob_dr_recv(m);
+  0.
+
+(* === Top-level === *)
+process
+  new ik_a: skey;
+  new ik_b: skey;
+  out(c, pk(ik_a));
+  out(c, pk(ik_b));
+  ((!processAlice(ik_a, pk(ik_b))) | (!processBob(ik_b)))

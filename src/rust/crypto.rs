@@ -47,6 +47,8 @@ pub(crate) fn x25519_ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u
 /// Legacy name for ECDH - kept for compatibility
 ///
 /// Returns Result for panic-free operation. Callers should use ? or .unwrap().
+/// Host unit tests only (`native_tests`); not built for wasm32.
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn simple_ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u8>, SignalError> {
     signal_protocol_core::simple_ecdh(private_key, public_key)
 }

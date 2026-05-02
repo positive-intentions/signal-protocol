@@ -36,7 +36,7 @@ describe("Double Ratchet Fix Verification", () => {
     const identityKeyPair = wasmModule.generate_identity_keypair();
     const signedPrekeyPair = wasmModule.generate_signed_prekey();
     const signedPrekeySignature = wasmModule.sign_data(
-      identityKeyPair.private_key,
+      identityKeyPair.ed25519().private_key,
       signedPrekeyPair.public_key,
     );
 
@@ -60,6 +60,7 @@ describe("Double Ratchet Fix Verification", () => {
   function getPublicKeyBundle(user) {
     return {
       identityKey: user.identityKeyPair.public_key,
+      identityEd25519Key: user.identityKeyPair.ed25519().public_key,
       signedPrekey: user.signedPrekeyPair.public_key,
       signedPrekeySignature: user.signedPrekeySignature,
       oneTimePrekey:
@@ -77,9 +78,12 @@ describe("Double Ratchet Fix Verification", () => {
     // Initiate X3DH
     const result = wasmModule.x3dh_initiate(
       alice.identityKeyPair.private_key,
+      alice.identityKeyPair.public_key,
       aliceEphemeral.private_key,
       bobBundle.identityKey,
+      bobBundle.identityEd25519Key,
       bobBundle.signedPrekey,
+      bobBundle.signedPrekeySignature,
       bobBundle.oneTimePrekey,
     );
 
