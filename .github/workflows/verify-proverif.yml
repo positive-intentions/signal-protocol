@@ -2,9 +2,15 @@ name: Verify ProVerif
 
 on:
   push:
-    branches: [staging]
+    branches:
+      - staging
+      - feat/updating-testing-scripts
+      - fix/formal-verification-for-f-star
   pull_request:
-    branches: [staging]
+    branches:
+      - staging
+      - feat/updating-testing-scripts
+      - fix/formal-verification-for-f-star
   workflow_dispatch:
 
 concurrency:

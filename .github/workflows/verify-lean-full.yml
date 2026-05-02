@@ -5,9 +5,15 @@ name: "[experimental] Verify Lean (full)"
 
 on:
   push:
-    branches: [feat/updating-testing-scripts]
+    branches:
+      - staging
+      - feat/updating-testing-scripts
+      - fix/formal-verification-for-f-star
   pull_request:
-    branches: [feat/updating-testing-scripts]
+    branches:
+      - staging
+      - feat/updating-testing-scripts
+      - fix/formal-verification-for-f-star
   workflow_dispatch:
 
 concurrency:
