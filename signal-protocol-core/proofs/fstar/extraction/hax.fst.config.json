@@ -14,11 +14,12 @@
     "always"
   ],
   "include_dirs": [
+    "../stubs",
     ".",
-    "${HACL_HOME}/lib",
-    "${HAX_HOME}/proof-libs/fstar/rust_primitives",
     "${HAX_HOME}/proof-libs/fstar/core",
+    "${HAX_HOME}/proof-libs/fstar/rust_primitives",
     "${HAX_HOME}/proof-libs/fstar/hax_lib",
-    "${HAX_HOME}/hax-lib/proofs/fstar/extraction"
+    "${HAX_HOME}/proofs/fstar/extraction",
+    "${HACL_HOME}/lib"
   ]
 }

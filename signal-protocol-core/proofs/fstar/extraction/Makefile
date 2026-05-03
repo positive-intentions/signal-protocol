@@ -92,9 +92,11 @@ export FINDLIBS
 # Hax proof libs from local hax-upstream directory
 HAX_PROOF_LIBS = ../../../../hax-upstream/hax-lib/proof-libs/fstar
 
-# Include directories - HACL optional, hax proof libs required
-FSTAR_INCLUDE_DIRS = . \
-  ../stubs \
+# Include directories - HACL optional, hax proof libs required.
+# ../stubs must come before . so overlays (e.g. Alloc.String with f_to_string) win over
+# any extracted copy under this directory or upstream core/.
+FSTAR_INCLUDE_DIRS = ../stubs \
+  . \
   $(HAX_PROOF_LIBS)/core \
   $(HAX_PROOF_LIBS)/rust_primitives \
   $(HAX_PROOF_LIBS)/hax_lib \
