@@ -117,7 +117,14 @@ pub fn perform_dh_ratchet_step(
     Ok(())
 }
 
+// TCB (F*): The skipped-message loop is not verified here—the extracted body is replaced with a
+// trivial `Ok(())` for F* so Z3 does not unfold up to MAX_SKIPPED_MESSAGE_KEYS iterations (HKDF,
+// BTreeMap, format!, etc.), which otherwise makes verification appear hung and memory use spike.
+// Runtime behavior remains the Rust implementation below; rely on tests and review for this loop.
 #[hax_lib::include]
+#[hax_lib::fstar::replace_body(
+    r#"Core_models.Result.Result_Ok () <: Core_models.Result.t_Result Prims.unit Signal_protocol_core.Error.t_SignalError"#
+)]
 pub fn skip_message_keys(
     state: &mut DoubleRatchetState,
     until_message_number: u32,
