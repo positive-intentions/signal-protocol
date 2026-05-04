@@ -71,8 +71,9 @@ pub fn perform_dh_ratchet_step(
 
             let combined = hkdf_derive(b"Signal_DH_Ratchet", &original_root_key, &dh_output, 64)?;
 
-            let new_root_key = combined[0..32].to_vec();
-            let recv_chain_key = combined[32..64].to_vec();
+            let (head, tail) = combined.split_at(32);
+            let new_root_key = head.to_vec();
+            let recv_chain_key = tail.to_vec();
             (new_root_key, recv_chain_key)
         } else {
             let recv_chain_key = hkdf_derive(
@@ -106,8 +107,9 @@ pub fn perform_dh_ratchet_step(
         64,
     )?;
 
-    state.root_key = combined[0..32].to_vec();
-    state.sending_chain_key = Some(combined[32..64].to_vec());
+    let (root_slice, sending_chain_slice) = combined.split_at(32);
+    state.root_key = root_slice.to_vec();
+    state.sending_chain_key = Some(sending_chain_slice.to_vec());
     state.sending_dh_keypair = Some(new_dh_keypair);
     state.previous_chain_length = state.sending_message_number;
     state.sending_message_number = 0;
@@ -293,8 +295,7 @@ pub fn double_ratchet_decrypt_internal(
         ));
     }
 
-    let nonce_bytes = &ciphertext_bytes[..12];
-    let encrypted_data = &ciphertext_bytes[12..];
+    let (nonce_bytes, encrypted_data) = ciphertext_bytes.split_at(12);
 
     let aad = {
         let mut aad = Vec::new();
@@ -396,8 +397,7 @@ fn aead_decrypt(
         let cipher = Aes256Gcm::new(key_ga);
         let nonce_ga = GenericArray::from_slice(nonce);
 
-        let encrypted_data = &ciphertext[..ciphertext.len() - 16];
-        let tag_bytes = &ciphertext[ciphertext.len() - 16..];
+        let (encrypted_data, tag_bytes) = ciphertext.split_at(ciphertext.len() - 16);
         let tag = AesGcmTag::from_slice(tag_bytes);
 
         let mut buffer = encrypted_data.to_vec();
