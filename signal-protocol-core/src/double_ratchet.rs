@@ -318,7 +318,11 @@ pub fn cleanup_skipped_message_keys_internal(
         return 0;
     };
 
-    let mut keys: Vec<_> = state.skipped_message_keys.keys().cloned().collect();
+    let mut keys: Vec<String> = state
+        .skipped_message_keys
+        .keys()
+        .map(|k| k.clone())
+        .collect();
     keys.sort();
 
     let mut removed_count = 0;
