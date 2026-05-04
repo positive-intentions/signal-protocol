@@ -142,11 +142,11 @@ $(CACHE_DIR)/%.checked: | .depend $(HINT_DIR) $(CACHE_DIR)
 	# Run each F* verification with a timeout to prevent unbounded solver/resource usage
 	timeout $(TIMEOUT) $(FSTAR) $(OTHERFLAGS) $* $(ENABLE_HINTS) --hint_file $(HINT_DIR)/$(notdir $*).hints
 
-# Double_ratchet: complex protocol - cap memory (512MB) to fail fast instead of hanging;
-# use --lax to type-check only (skips SMT) when resources are limited
+# Double_ratchet: complex protocol; Z3 memory_high_watermark_mb=4096 as a tuning knob under CI.
+# CI OOM (exit 137) is addressed mainly by host swap in verify-fstar-full.yml.
 $(CACHE_DIR)/Signal_protocol_core.Double_ratchet.fst.checked: | .depend $(HINT_DIR) $(CACHE_DIR)
 	timeout $(TIMEOUT) $(FSTAR) --z3rlimit 200 --fuel 1 --ifuel 2 \
-	  --z3cliopt 'memory_high_watermark_mb=512' \
+	  --z3cliopt 'memory_high_watermark_mb=4096' \
 	  $(OTHERFLAGS) Signal_protocol_core.Double_ratchet.fst $(ENABLE_HINTS) --hint_file $(HINT_DIR)/Signal_protocol_core.Double_ratchet.fst.hints
 
 # Full verification (includes Double_ratchet; may hang on limited resources)
