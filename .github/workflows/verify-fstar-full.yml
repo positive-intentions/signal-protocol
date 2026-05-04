@@ -38,6 +38,8 @@ jobs:
       # F* + Z3 for Double_ratchet can exceed RAM on ubuntu-latest; exit 137 is typically OOM.
       - name: Enable swap (reduce OOM risk for F*)
         run: |
+          sudo swapoff /swapfile 2>/dev/null || true
+          sudo rm -f /swapfile
           sudo fallocate -l 16G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=16384
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
