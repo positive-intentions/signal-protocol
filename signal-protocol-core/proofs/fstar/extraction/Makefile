@@ -120,7 +120,11 @@ FSTAR_FLAGS = --cmi \
 FSTAR = $(FSTAR_BIN) $(FSTAR_FLAGS)
 
 # Per-F* invocation timeout to avoid unbounded solver/hang. Can be overridden by env.
+# GNU timeout: exit 124 = wall-clock limit; exit 137 is often OOM (SIGKILL).
 TIMEOUT ?= 600s
+
+# Double_ratchet needs a much higher wall limit than other modules (still bounded for CI).
+TIMEOUT_DOUBLE_RATCHET ?= 7200s
 
 .depend: $(HINT_DIR) $(CACHE_DIR) $(ROOTS)
 	$(info ROOTS: $(ROOTS))
@@ -145,7 +149,7 @@ $(CACHE_DIR)/%.checked: | .depend $(HINT_DIR) $(CACHE_DIR)
 # Double_ratchet: complex protocol; Z3 memory_high_watermark_mb=4096 as a tuning knob under CI.
 # CI OOM (exit 137) is addressed mainly by host swap in verify-fstar-full.yml.
 $(CACHE_DIR)/Signal_protocol_core.Double_ratchet.fst.checked: | .depend $(HINT_DIR) $(CACHE_DIR)
-	timeout $(TIMEOUT) $(FSTAR) --z3rlimit 200 --fuel 1 --ifuel 2 \
+	timeout $(TIMEOUT_DOUBLE_RATCHET) $(FSTAR) --z3rlimit 200 --fuel 1 --ifuel 2 \
 	  --z3cliopt 'memory_high_watermark_mb=4096' \
 	  $(OTHERFLAGS) Signal_protocol_core.Double_ratchet.fst $(ENABLE_HINTS) --hint_file $(HINT_DIR)/Signal_protocol_core.Double_ratchet.fst.hints
 
