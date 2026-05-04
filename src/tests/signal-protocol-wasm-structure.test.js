@@ -207,8 +207,8 @@ describe("WASM Module Structure and Build Validation", () => {
       );
       const dtsContent = fs.readFileSync(dtsFile, "utf8");
 
-      // Key generation: identity returns IdentityKeyPair (X25519 + Ed25519); other generators return KeyPair
-      expect(dtsContent).toContain("generate_identity_keypair(): IdentityKeyPair");
+      // Key generation: WASM typings use KeyPair for identity and other DH generators; JS wrappers add semantic names
+      expect(dtsContent).toContain("generate_identity_keypair(): KeyPair");
       expect(dtsContent).toContain("generate_signed_prekey(): KeyPair");
 
       // X3DH functions should return X3DHResult
