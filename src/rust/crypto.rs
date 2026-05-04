@@ -35,11 +35,13 @@ fn log(s: &str) {
 }
 
 /// Validate that a public key is a valid X25519 point - delegates to core
+#[cfg(test)]
 pub(crate) fn validate_x25519_public_key(public_key: &[u8]) -> Result<(), SignalError> {
     signal_protocol_core::validate_x25519_public_key(public_key)
 }
 
 /// Perform X25519 ECDH - delegates to core
+#[cfg(test)]
 pub(crate) fn x25519_ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u8>, SignalError> {
     signal_protocol_core::crypto::x25519_ecdh(private_key, public_key)
 }
@@ -47,6 +49,7 @@ pub(crate) fn x25519_ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u
 /// Legacy name for ECDH - kept for compatibility
 ///
 /// Returns Result for panic-free operation. Callers should use ? or .unwrap().
+#[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) fn simple_ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u8>, SignalError> {
     signal_protocol_core::simple_ecdh(private_key, public_key)
 }
