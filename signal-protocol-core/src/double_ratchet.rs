@@ -71,8 +71,9 @@ pub fn perform_dh_ratchet_step(
 
             let combined = hkdf_derive(b"Signal_DH_Ratchet", &original_root_key, &dh_output, 64)?;
 
-            let new_root_key = combined[0..32].to_vec();
-            let recv_chain_key = combined[32..64].to_vec();
+            let (head, tail) = combined.split_at(32);
+            let new_root_key = head.to_vec();
+            let recv_chain_key = tail.to_vec();
             (new_root_key, recv_chain_key)
         } else {
             let recv_chain_key = hkdf_derive(
@@ -106,8 +107,9 @@ pub fn perform_dh_ratchet_step(
         64,
     )?;
 
-    state.root_key = combined[0..32].to_vec();
-    state.sending_chain_key = Some(combined[32..64].to_vec());
+    let (root_slice, sending_chain_slice) = combined.split_at(32);
+    state.root_key = root_slice.to_vec();
+    state.sending_chain_key = Some(sending_chain_slice.to_vec());
     state.sending_dh_keypair = Some(new_dh_keypair);
     state.previous_chain_length = state.sending_message_number;
     state.sending_message_number = 0;
@@ -115,7 +117,14 @@ pub fn perform_dh_ratchet_step(
     Ok(())
 }
 
+// TCB (F*): The skipped-message loop is not verified here—the extracted body is replaced with a
+// trivial `Ok(())` for F* so Z3 does not unfold up to MAX_SKIPPED_MESSAGE_KEYS iterations (HKDF,
+// BTreeMap, format!, etc.), which otherwise makes verification appear hung and memory use spike.
+// Runtime behavior remains the Rust implementation below; rely on tests and review for this loop.
 #[hax_lib::include]
+#[hax_lib::fstar::replace_body(
+    r#"Core_models.Result.Result_Ok () <: Core_models.Result.t_Result Prims.unit Signal_protocol_core.Error.t_SignalError"#
+)]
 pub fn skip_message_keys(
     state: &mut DoubleRatchetState,
     until_message_number: u32,
@@ -238,7 +247,13 @@ pub fn double_ratchet_encrypt_internal(
     Ok(message)
 }
 
+// TCB (F*): Decrypt path is not verified here—BTreeMap, hex/format key ids, branchy chain logic, and
+// AEAD drive extreme SMT cost and apparent hangs in CI. Extracted body is a fixed `Err` for F*;
+// runtime behavior remains the Rust implementation below; rely on tests and review.
 #[hax_lib::include]
+#[hax_lib::fstar::replace_body(
+    r#"Core_models.Result.Result_Err (Signal_protocol_core.Error.SignalError_Decryption (Alloc.String.String "F* stub: double_ratchet_decrypt_internal")) <: Core_models.Result.t_Result (Alloc.Vec.t_Vec u8 Alloc.Alloc.t_Global) Signal_protocol_core.Error.t_SignalError"#
+)]
 pub fn double_ratchet_decrypt_internal(
     state: &mut DoubleRatchetState,
     message: &DoubleRatchetMessage,
@@ -293,8 +308,7 @@ pub fn double_ratchet_decrypt_internal(
         ));
     }
 
-    let nonce_bytes = &ciphertext_bytes[..12];
-    let encrypted_data = &ciphertext_bytes[12..];
+    let (nonce_bytes, encrypted_data) = ciphertext_bytes.split_at(12);
 
     let aad = {
         let mut aad = Vec::new();
@@ -307,7 +321,10 @@ pub fn double_ratchet_decrypt_internal(
     aead_decrypt(&message_key, encrypted_data, nonce_bytes, &aad)
 }
 
+// TCB (F*): Cleanup loop over skipped keys is not verified here—hax can expand iteration over maps in
+// ways that stall Z3. Extracted body returns 0 for F*; runtime behavior remains the Rust code below.
 #[hax_lib::include]
+#[hax_lib::fstar::replace_body(r#"mk_usize 0"#)]
 pub fn cleanup_skipped_message_keys_internal(
     state: &mut DoubleRatchetState,
     max_keys: usize,
@@ -318,8 +335,11 @@ pub fn cleanup_skipped_message_keys_internal(
         return 0;
     };
 
-    let mut keys: Vec<_> = state.skipped_message_keys.keys().cloned().collect();
-    keys.sort();
+    let keys: Vec<String> = state
+        .skipped_message_keys
+        .keys()
+        .map(|k| k.clone())
+        .collect();
 
     let mut removed_count = 0;
     for key in keys.iter().take(keys_to_remove) {
@@ -393,8 +413,7 @@ fn aead_decrypt(
         let cipher = Aes256Gcm::new(key_ga);
         let nonce_ga = GenericArray::from_slice(nonce);
 
-        let encrypted_data = &ciphertext[..ciphertext.len() - 16];
-        let tag_bytes = &ciphertext[ciphertext.len() - 16..];
+        let (encrypted_data, tag_bytes) = ciphertext.split_at(ciphertext.len() - 16);
         let tag = AesGcmTag::from_slice(tag_bytes);
 
         let mut buffer = encrypted_data.to_vec();

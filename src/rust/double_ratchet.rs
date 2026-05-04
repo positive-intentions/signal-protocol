@@ -166,6 +166,7 @@ pub fn initialize_double_ratchet(
 }
 
 /// Derive a message key from a chain key - delegates to core (for tests)
+#[cfg(test)]
 pub(crate) fn derive_message_key(
     chain_key: &[u8],
 ) -> Result<Vec<u8>, crate::rust::error::SignalError> {
@@ -173,6 +174,7 @@ pub(crate) fn derive_message_key(
 }
 
 /// Derive the next chain key - delegates to core (for tests)
+#[cfg(test)]
 pub(crate) fn derive_next_chain_key(
     chain_key: &[u8],
 ) -> Result<Vec<u8>, crate::rust::error::SignalError> {
@@ -236,6 +238,7 @@ pub fn cleanup_skipped_message_keys(state: &mut DoubleRatchetState, max_keys: us
 }
 
 /// Perform DH ratchet step - delegates to core (for tests)
+#[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) fn perform_dh_ratchet_step(
     state: &mut DoubleRatchetState,
     new_remote_public_key: &[u8],
@@ -247,6 +250,7 @@ pub(crate) fn perform_dh_ratchet_step(
 }
 
 /// Skip message keys - delegates to core (for tests)
+#[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) fn skip_message_keys(
     state: &mut DoubleRatchetState,
     until_message_number: u32,
@@ -258,6 +262,7 @@ pub(crate) fn skip_message_keys(
 }
 
 /// Cleanup skipped keys internal - delegates to core (for tests)
+#[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) fn cleanup_skipped_message_keys_internal(
     state: &mut DoubleRatchetState,
     max_keys: usize,
@@ -270,6 +275,7 @@ pub(crate) fn cleanup_skipped_message_keys_internal(
 }
 
 /// Internal version for native testing - delegates to core
+#[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) fn initialize_double_ratchet_internal(
     shared_secret: &[u8],
     is_initiator: bool,
@@ -279,6 +285,7 @@ pub(crate) fn initialize_double_ratchet_internal(
 }
 
 /// Internal encrypt for native testing - delegates to core
+#[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) fn double_ratchet_encrypt_internal(
     state: &mut DoubleRatchetState,
     plaintext: &[u8],
@@ -296,6 +303,7 @@ pub(crate) fn double_ratchet_encrypt_internal(
 }
 
 /// Internal decrypt for native testing - delegates to core
+#[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) fn double_ratchet_decrypt_internal(
     state: &mut DoubleRatchetState,
     message: &DoubleRatchetMessage,

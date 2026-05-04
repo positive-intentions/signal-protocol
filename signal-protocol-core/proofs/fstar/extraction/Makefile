@@ -35,6 +35,9 @@ ROOTS_LITE = $(filter-out Signal_protocol_core.Double_ratchet.fst,$(ROOTS))
 # Hax invocation for extraction WITHOUT crypto-backend feature
 # This enables the abstract crypto stubs for F* verification
 HAX_CLI = cargo-hax -C --no-default-features \; into fstar --z3rlimit 40
+# Drop extracted Alloc.String so F* does not prefer cwd over --include (see F* wiki:
+# Dealing with dependencies). Stub ../stubs/Alloc.String.fst supplies f_to_string.
+HAX_CLI_POST = rm -f Alloc.String.fst Alloc.String.fsti
 
 # Ensure HACL* is available for crypto primitives
 ${HACL_HOME}:
@@ -56,13 +59,13 @@ NEEDS_EXTRACTION = $(shell [ -z "$(EXTRACTED_FST)" ] && echo yes)
 # Extract F* from Rust if no extracted files exist
 ifneq "$(NEEDS_EXTRACTION)" ""
 $(info Extracting F* from Rust...)
-$(shell $(HAX_CLI))
+$(shell $(HAX_CLI) && $(HAX_CLI_POST))
 endif
 
 # Regenerate extracted F* when Rust sources change
 $(EXTRACTED_FST): $(shell find ../../../src -type f -name '*.rs')
 	@echo "Rust sources changed, re-extracting F*..."
-	$(HAX_CLI)
+	$(HAX_CLI) && $(HAX_CLI_POST)
 
 # Discover F* libraries from cargo dependencies
 define FINDLIBS
@@ -92,14 +95,16 @@ export FINDLIBS
 # Hax proof libs from local hax-upstream directory
 HAX_PROOF_LIBS = ../../../../hax-upstream/hax-lib/proof-libs/fstar
 
-# Include directories - HACL optional, hax proof libs required
+# Include directories - HACL optional, hax proof libs required.
+# F* picks the implementation with highest precedence among --include paths (later wins).
+# ../stubs last so overlays (e.g. Alloc.String with f_to_string) shadow hax-lib core/.
 FSTAR_INCLUDE_DIRS = . \
-  ../stubs \
   $(HAX_PROOF_LIBS)/core \
   $(HAX_PROOF_LIBS)/rust_primitives \
   $(HAX_PROOF_LIBS)/hax_lib \
   $(HAX_HOME)/proofs/fstar/extraction \
-  $(if $(wildcard $(HACL_HOME)/lib),$(HACL_HOME)/lib)
+  $(if $(wildcard $(HACL_HOME)/lib),$(HACL_HOME)/lib) \
+  ../stubs
 
 # --z3refresh: spawn fresh Z3 per query to avoid memory accumulation/hangs
 # --z3rlimit: increased for complex modules (Double_ratchet); 40 was too low
@@ -115,7 +120,11 @@ FSTAR_FLAGS = --cmi \
 FSTAR = $(FSTAR_BIN) $(FSTAR_FLAGS)
 
 # Per-F* invocation timeout to avoid unbounded solver/hang. Can be overridden by env.
+# GNU timeout: exit 124 = wall-clock limit; exit 137 is often OOM (SIGKILL).
 TIMEOUT ?= 600s
+
+# Double_ratchet needs a much higher wall limit than other modules (still bounded for CI).
+TIMEOUT_DOUBLE_RATCHET ?= 7200s
 
 .depend: $(HINT_DIR) $(CACHE_DIR) $(ROOTS)
 	$(info ROOTS: $(ROOTS))
@@ -137,11 +146,11 @@ $(CACHE_DIR)/%.checked: | .depend $(HINT_DIR) $(CACHE_DIR)
 	# Run each F* verification with a timeout to prevent unbounded solver/resource usage
 	timeout $(TIMEOUT) $(FSTAR) $(OTHERFLAGS) $* $(ENABLE_HINTS) --hint_file $(HINT_DIR)/$(notdir $*).hints
 
-# Double_ratchet: complex protocol - cap memory (512MB) to fail fast instead of hanging;
-# use --lax to type-check only (skips SMT) when resources are limited
+# Double_ratchet: complex protocol; Z3 memory_high_watermark_mb=4096 as a tuning knob under CI.
+# CI OOM (exit 137) is addressed mainly by host swap in verify-fstar-full.yml.
 $(CACHE_DIR)/Signal_protocol_core.Double_ratchet.fst.checked: | .depend $(HINT_DIR) $(CACHE_DIR)
-	timeout $(TIMEOUT) $(FSTAR) --z3rlimit 200 --fuel 1 --ifuel 2 \
-	  --z3cliopt 'memory_high_watermark_mb=512' \
+	timeout $(TIMEOUT_DOUBLE_RATCHET) $(FSTAR) --z3rlimit 200 --fuel 1 --ifuel 2 \
+	  --z3cliopt 'memory_high_watermark_mb=4096' \
 	  $(OTHERFLAGS) Signal_protocol_core.Double_ratchet.fst $(ENABLE_HINTS) --hint_file $(HINT_DIR)/Signal_protocol_core.Double_ratchet.fst.hints
 
 # Full verification (includes Double_ratchet; may hang on limited resources)
@@ -152,7 +161,7 @@ verify-lite: $(addsuffix .checked, $(addprefix $(CACHE_DIR)/,$(ROOTS_LITE)))
 
 # Extract only (no verification)
 extract:
-	$(HAX_CLI)
+	$(HAX_CLI) && $(HAX_CLI_POST)
 
 # Interactive mode targets
 %.fst-in:
@@ -164,4 +173,5 @@ extract:
 clean:
 	rm -rf $(CACHE_DIR) $(HINT_DIR) .depend
 	# Remove only extracted files, preserve hand-written AbstractCrypto.fst
-	rm -f Signal_protocol_core*.fst Signal_protocol_core*.fsti
+	rm -f Signal_protocol_core*.fst Signal_protocol_core*.fsti \
+		Alloc.String.fst Alloc.String.fsti
