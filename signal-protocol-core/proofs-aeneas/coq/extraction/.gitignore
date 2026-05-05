@@ -1,0 +1,9 @@
+*.vo
+*.glob
+*.vok
+*.vos
+*.aux
+.*.aux
+_CoqProject
+Signal_protocol_core*.v
+signal_protocol_core.llbc
