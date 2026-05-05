@@ -1,0 +1,7 @@
+*.checked
+*.hints
+.depend
+.cache/
+Signal_protocol_core*.fst
+Signal_protocol_core*.fsti
+signal_protocol_core.llbc

@@ -94,9 +94,9 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
 # ============================================
-# Stage 8: Formal verification base
+# Stage 8: Prover base (shared by hax + aeneas)
 # ============================================
-FROM debian:bookworm AS formal-base
+FROM debian:bookworm AS prover-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -118,24 +118,13 @@ RUN apt-get update && apt-get install -y \
     npm \
     && rm -rf /var/lib/apt/lists/*
 
-# Initialize OPAM with OCaml 5.1.1
 ENV OPAMROOT=/root/.opam \
-    PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.local/bin:$PATH
+    PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:$PATH
 
 RUN opam init --disable-sandboxing --bare -y && \
     opam switch create 5.1.1 --no-switch && \
     opam switch 5.1.1 && \
     eval $(opam env)
-
-# Install Rust with nightly toolchain for hax (edition2024 requires 1.85+)
-ENV RUSTUP_HOME=/root/.rustup \
-    CARGO_HOME=/root/.cargo \
-    PATH=/root/.cargo/bin:$PATH
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2025-02-01 && \
-    rustup component add --toolchain nightly-2025-02-01 rustc-dev llvm-tools-preview rust-analysis rust-src rustfmt && \
-    rustup default nightly-2025-02-01 && \
-    rustc --version && cargo --version
 
 # Install F*, Rocq, Z3, and ProVerif via OPAM
 RUN eval $(opam env) && \
@@ -157,6 +146,22 @@ RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -
     elan toolchain list && \
     lean --version
 
+WORKDIR /app
+
+# ============================================
+# Stage 9: Hax formal verification base
+# ============================================
+FROM prover-base AS formal-base
+
+ENV RUSTUP_HOME=/root/.rustup \
+    CARGO_HOME=/root/.cargo \
+    PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:$PATH
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2025-02-01 && \
+    rustup component add --toolchain nightly-2025-02-01 rustc-dev llvm-tools-preview rust-analysis rust-src rustfmt && \
+    rustup default nightly-2025-02-01 && \
+    rustc --version && cargo --version
+
 # Install hax from git
 RUN eval $(opam env) && \
     git clone https://github.com/hacspec/hax.git /tmp/hax && \
@@ -164,10 +169,8 @@ RUN eval $(opam env) && \
     ./setup.sh && \
     rm -rf /tmp/hax
 
-WORKDIR /app
-
 # ============================================
-# Stage 9: Formal verification runner
+# Stage 10: Hax formal verification runner
 # ============================================
 FROM formal-base AS verification
 
@@ -181,9 +184,63 @@ WORKDIR /app
 CMD ["cargo", "hax", "into", "fstar", "-p", "signal-protocol-core"]
 
 # ============================================
-# Stage 10: ProVerif runner
+# Stage 11: Aeneas formal verification base
 # ============================================
-FROM formal-base AS proverif
+FROM prover-base AS aeneas-base
+
+ENV RUSTUP_HOME=/root/.rustup \
+    CARGO_HOME=/root/.cargo \
+    PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:$PATH
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2026-02-07 && \
+    rustup component add --toolchain nightly-2026-02-07 rustc-dev llvm-tools-preview rust-src miri && \
+    rustup default nightly-2026-02-07 && \
+    rustc --version && cargo --version
+
+# Install Charon (Rust -> LLBC compiler, required by Aeneas)
+RUN git clone https://github.com/AeneasVerif/charon.git /tmp/charon && \
+    cd /tmp/charon && \
+    git checkout ed22146b1cd4d0b578006a58b3299d41ecbe0fd4 && \
+    make build-charon-rust && \
+    cp bin/charon /root/.cargo/bin/charon && \
+    rm -rf /tmp/charon
+
+# Install Aeneas (OCaml: LLBC -> F*/Coq/Lean translator)
+RUN eval $(opam env) && \
+    opam install -y --no-depexts ppx_deriving visitors easy_logging zarith yojson \
+    core_unix ocamlgraph menhir unionFind progress domainslib && \
+    git clone https://github.com/AeneasVerif/aeneas.git /tmp/aeneas && \
+    cd /tmp/aeneas && \
+    git submodule update --init charon && \
+    cd charon && git checkout ed22146b1cd4d0b578006a58b3299d41ecbe0fd4 && cd .. && \
+    make setup-charon && \
+    make build-bin build-lib && \
+    mkdir -p /opt/aeneas/bin /opt/aeneas/backends && \
+    cp -f src/_build/default/main.exe /opt/aeneas/bin/aeneas && \
+    cp -rf backends/fstar /opt/aeneas/backends/fstar && \
+    cp -rf backends/coq /opt/aeneas/backends/coq && \
+    cp -rf backends/lean /opt/aeneas/backends/lean && \
+    ln -sf /opt/aeneas/bin/aeneas /root/.opam/5.1.1/bin/aeneas && \
+    rm -rf /tmp/aeneas
+
+# ============================================
+# Stage 12: Aeneas formal verification runner
+# ============================================
+FROM aeneas-base AS aeneas-verification
+
+COPY Cargo.toml Cargo.lock ./
+COPY signal-protocol-core ./signal-protocol-core
+
+RUN printf '[toolchain]\nchannel = "nightly-2026-02-07"\ncomponents = ["rustc-dev", "llvm-tools-preview", "rust-src", "miri"]\n' > rust-toolchain.toml
+
+WORKDIR /app
+
+CMD ["bash", "-lc", "cd signal-protocol-core && charon cargo --preset=aeneas && aeneas -backend fstar signal_protocol_core.llbc"]
+
+# ============================================
+# Stage 13: ProVerif runner
+# ============================================
+FROM prover-base AS proverif
 
 COPY formal-proofs ./formal-proofs
 

@@ -248,3 +248,84 @@ services:
       - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     working_dir: /app/signal-protocol-core/proofs/coq/extraction
     command: make verify
+
+  # ============================================
+  # Aeneas verification services
+  # ============================================
+
+  aeneas-fstar:
+    build:
+      context: .
+      target: aeneas-verification
+    volumes:
+      - ./signal-protocol-core:/app/signal-protocol-core
+      - ./aeneas-upstream:/app/aeneas-upstream
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: bash -lc "cd signal-protocol-core && charon cargo --preset=aeneas && aeneas -backend fstar signal_protocol_core.llbc"
+
+  aeneas-coq:
+    build:
+      context: .
+      target: aeneas-verification
+    volumes:
+      - ./signal-protocol-core:/app/signal-protocol-core
+      - ./aeneas-upstream:/app/aeneas-upstream
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: bash -lc "cd signal-protocol-core && charon cargo --preset=aeneas && aeneas -backend coq signal_protocol_core.llbc"
+
+  aeneas-lean:
+    build:
+      context: .
+      target: aeneas-verification
+    volumes:
+      - ./signal-protocol-core:/app/signal-protocol-core
+      - ./aeneas-upstream:/app/aeneas-upstream
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: bash -lc "cd signal-protocol-core && charon cargo --preset=aeneas && aeneas -backend lean signal_protocol_core.llbc"
+
+  aeneas-verify-runner:
+    image: signal-protocol-aeneas-verify-runner:latest
+    build:
+      context: .
+      target: aeneas-verification
+    volumes:
+      - ./:/app
+    working_dir: /app
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: >
+      bash -lc "
+        if [ ! -d aeneas-upstream/backends ]; then
+          echo 'Cloning aeneas-upstream (AeneasVerif/aeneas) for proof libraries...';
+          git clone --depth=1 https://github.com/AeneasVerif/aeneas.git aeneas-upstream;
+        fi;
+        eval \"$(opam env)\";
+        npm run verify:aeneas:host
+      "
+
+  aeneas-lean-verify:
+    build:
+      context: .
+      target: aeneas-verification
+    volumes:
+      - ./signal-protocol-core:/app/signal-protocol-core
+      - ./aeneas-upstream:/app/aeneas-upstream
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    working_dir: /app/signal-protocol-core/proofs-aeneas/lean
+    command: lake build
+
+  aeneas-shell:
+    build:
+      context: .
+      target: aeneas-verification
+    volumes:
+      - ./:/app
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: /bin/bash
+    stdin_open: true
+    tty: true

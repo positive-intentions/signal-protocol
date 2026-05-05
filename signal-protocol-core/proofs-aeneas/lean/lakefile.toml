@@ -1,0 +1,11 @@
+name = "SignalProtocolCoreAeneas"
+version = "0.1.0"
+defaultTargets = ["SignalProtocolCoreAeneas"]
+
+[[lean_lib]]
+name = "SignalProtocolCoreAeneas"
+roots = ["extraction.signal_protocol_core", "extraction.AbstractCrypto"]
+
+[[require]]
+name = "aeneas"
+path = "../../../aeneas-upstream/backends/lean"
