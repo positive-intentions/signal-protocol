@@ -101,6 +101,34 @@ services:
       - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     command: cargo hax into fstar
 
+  # Runs the full `npm run verify:host` chain (F* + Rocq + Lean) inside the
+  # verification image. Used both by `npm run verify:docker` for local
+  # fallback and by the `Verify` GitHub Actions workflow for CI.
+  #
+  # An explicit `image:` tag is pinned so CI can pre-build the image with
+  # buildx + GHA cache and `docker compose run` picks it up by tag instead
+  # of rebuilding. Locally, if the image does not exist, compose falls back
+  # to building via the `build:` block below.
+  verify-runner:
+    image: signal-protocol-verify-runner:latest
+    build:
+      context: .
+      target: verification
+    volumes:
+      - ./:/app
+    working_dir: /app
+    environment:
+      - PATH=/root/.opam/5.1.1/bin:/root/.cargo/bin:/root/.elan/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command: >
+      bash -lc "
+        if [ ! -d hax-upstream/hax-lib ]; then
+          echo 'Cloning hax-upstream (hacspec/hax) for proof libraries...';
+          git clone --depth=1 https://github.com/hacspec/hax.git hax-upstream;
+        fi;
+        eval \"$(opam env)\";
+        npm run verify:host
+      "
+
   hax-fstar:
     build:
       context: .

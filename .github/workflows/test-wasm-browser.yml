@@ -1,0 +1,53 @@
+name: Test WASM (Browser)
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [staging]
+  workflow_dispatch:
+
+concurrency:
+  group: test-wasm-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: WASM tests (headless Chrome)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      # GitHub-hosted ubuntu-latest runners ship with Chrome, but we pin a
+      # matching ChromeDriver via the dedicated action so there's no version
+      # skew with wasm-pack's own cached chromedriver (which has previously
+      # mismatched minor versions locally).
+      - uses: browser-actions/setup-chrome@v1
+        id: setup-chrome
+        with:
+          chrome-version: stable
+
+      - uses: nanasess/setup-chromedriver@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run wasm-pack browser tests
+        env:
+          CHROME_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
+        run: npm run test:wasm

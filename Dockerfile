@@ -102,6 +102,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     curl \
+    wget \
+    unzip \
     build-essential \
     pkg-config \
     libssl-dev \
@@ -139,10 +141,19 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 RUN eval $(opam env) && \
     opam install -y --no-depexts z3 fstar rocq-prover proverif
 
+# Pinned Z3 binary for F* (Makefile --z3version 4.13.3; npm FSTAR_Z3_EXE). OPAM's z3 may be newer.
+RUN cd /tmp && \
+    wget -q https://github.com/Z3Prover/z3/releases/download/z3-4.13.3/z3-4.13.3-x64-glibc-2.35.zip && \
+    unzip -q -o z3-4.13.3-x64-glibc-2.35.zip && \
+    cp /tmp/z3-4.13.3-x64-glibc-2.35/bin/z3 /root/.opam/5.1.1/bin/z3-4.13.3 && \
+    chmod +x /root/.opam/5.1.1/bin/z3-4.13.3 && \
+    /root/.opam/5.1.1/bin/z3-4.13.3 --version && \
+    rm -rf /tmp/z3-4.13.3-x64-glibc-2.35 /tmp/z3-4.13.3-x64-glibc-2.35.zip
+
 # Install Lean via elan
 ENV ELAN_HOME=/root/.elan \
     PATH=/root/.elan/bin:${PATH}
-RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.28.0-rc1 && \
+RUN curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.28.1 && \
     elan toolchain list && \
     lean --version
 

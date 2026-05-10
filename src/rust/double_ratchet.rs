@@ -432,23 +432,114 @@ mod tests {
         assert_eq!(String::from_utf8(dec3.to_vec()).unwrap(), "Message 3");
     }
 
+    // Signal Double Ratchet semantics (per spec):
+    //   - At init, both parties share the same root_key (= shared_secret).
+    //   - Sending a message does NOT advance root_key.
+    //   - Receiving a message with a new DH public key triggers DHRatchet,
+    //     which performs TWO KDF_RK calls - one matching the sender's last
+    //     sending ratchet, plus one fresh sending ratchet on the receiver.
+    //   - After a ping-pong (A->B, B->A), the receiver is always one DH
+    //     ratchet step ahead of the peer, so the root_keys intentionally
+    //     diverge. Previously this test asserted the opposite, which is
+    //     mathematically impossible for any correct DR implementation.
     #[wasm_bindgen_test]
-    fn test_root_key_synchronization() {
+    fn test_root_key_invariants_after_init() {
+        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
+        let alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
+        let bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let alice_root = alice_state.root_key().to_vec();
+        let bob_root = bob_state.root_key().to_vec();
+        assert_eq!(alice_root, bob_root, "roots must match at init");
+        assert_eq!(alice_root, vec![1u8; 32], "initial root equals shared_secret");
+    }
+
+    #[wasm_bindgen_test]
+    fn test_send_does_not_advance_root_key() {
+        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
+        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
+        let before = alice_state.root_key().to_vec();
+        let _enc = double_ratchet_encrypt(
+            &mut alice_state,
+            &Uint8Array::from("Message 1".as_bytes()),
+        )
+        .unwrap();
+        let after = alice_state.root_key().to_vec();
+        assert_eq!(before, after, "encrypt must not advance root_key");
+    }
+
+    #[wasm_bindgen_test]
+    fn test_receive_advances_root_key_and_diverges() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
         let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
         let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
-        let alice_root = alice_state.root_key().to_vec();
-        let bob_root = bob_state.root_key().to_vec();
-        assert_eq!(alice_root, bob_root);
-        let msg1 = Uint8Array::from("Message 1".as_bytes());
-        let enc1 = double_ratchet_encrypt(&mut alice_state, &msg1).unwrap();
-        let _dec1 = double_ratchet_decrypt(&mut bob_state, &enc1).unwrap();
-        let msg2 = Uint8Array::from("Message 2".as_bytes());
-        let enc2 = double_ratchet_encrypt(&mut bob_state, &msg2).unwrap();
-        let _dec2 = double_ratchet_decrypt(&mut alice_state, &enc2).unwrap();
-        let alice_root_after = alice_state.root_key().to_vec();
-        let bob_root_after = bob_state.root_key().to_vec();
-        assert_eq!(alice_root_after, bob_root_after);
+        let initial_root = alice_state.root_key().to_vec();
+
+        let enc1 = double_ratchet_encrypt(
+            &mut alice_state,
+            &Uint8Array::from("Message 1".as_bytes()),
+        )
+        .unwrap();
+        let _ = double_ratchet_decrypt(&mut bob_state, &enc1).unwrap();
+
+        let bob_root_after_recv = bob_state.root_key().to_vec();
+        assert_ne!(
+            bob_root_after_recv, initial_root,
+            "Bob's root must advance on first DH ratchet"
+        );
+        assert_eq!(
+            alice_state.root_key().to_vec(),
+            initial_root,
+            "Alice's root unchanged until she receives"
+        );
+
+        let enc2 = double_ratchet_encrypt(
+            &mut bob_state,
+            &Uint8Array::from("Message 2".as_bytes()),
+        )
+        .unwrap();
+        let _ = double_ratchet_decrypt(&mut alice_state, &enc2).unwrap();
+
+        let alice_root_after_recv = alice_state.root_key().to_vec();
+        assert_ne!(
+            alice_root_after_recv, initial_root,
+            "Alice's root must advance after DH ratchet on receive"
+        );
+        assert_ne!(
+            alice_root_after_recv, bob_root_after_recv,
+            "per Signal spec, receiver ends one DH-ratchet step ahead of peer"
+        );
+    }
+
+    #[wasm_bindgen_test]
+    fn test_decryption_survives_root_key_divergence() {
+        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
+        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
+        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+
+        let enc1 = double_ratchet_encrypt(
+            &mut alice_state,
+            &Uint8Array::from("Message 1".as_bytes()),
+        )
+        .unwrap();
+        let dec1 = double_ratchet_decrypt(&mut bob_state, &enc1).unwrap();
+        assert_eq!(String::from_utf8(dec1.to_vec()).unwrap(), "Message 1");
+
+        let enc2 = double_ratchet_encrypt(
+            &mut bob_state,
+            &Uint8Array::from("Message 2".as_bytes()),
+        )
+        .unwrap();
+        let dec2 = double_ratchet_decrypt(&mut alice_state, &enc2).unwrap();
+        assert_eq!(String::from_utf8(dec2.to_vec()).unwrap(), "Message 2");
+
+        // Roots have diverged at this point - confirm the protocol still works.
+        let enc3 = double_ratchet_encrypt(
+            &mut alice_state,
+            &Uint8Array::from("Message 3".as_bytes()),
+        )
+        .unwrap();
+        let dec3 = double_ratchet_decrypt(&mut bob_state, &enc3).unwrap();
+        assert_eq!(String::from_utf8(dec3.to_vec()).unwrap(), "Message 3");
     }
 
     #[wasm_bindgen_test]

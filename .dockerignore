@@ -21,8 +21,15 @@ target/
 # IDE
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
+
+# CI / local tooling (not used by Dockerfile COPY; avoids busting COPY . . cache)
+.github/
+
+# Root documentation only (build does not import these)
+/*.md
 
 # OS files
 .DS_Store

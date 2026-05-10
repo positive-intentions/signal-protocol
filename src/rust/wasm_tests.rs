@@ -16,7 +16,7 @@ mod wasm_tests {
         utils::*,
         double_ratchet::*,
         types::*,
-        error::SignalError,
+        error::{SignalError, signal_error_to_js_value},
     };
 
     // Tests can run in both browser and node environments
@@ -35,7 +35,7 @@ mod wasm_tests {
     #[wasm_bindgen_test]
     fn test_signal_error_to_js_value() {
         let error = SignalError::KeyGeneration("test error".to_string());
-        let js_value: JsValue = error.into();
+        let js_value: JsValue = signal_error_to_js_value(error);
         
         // Test that the conversion worked
         assert!(js_value.is_string());
@@ -59,7 +59,7 @@ mod wasm_tests {
         ];
         
         for error in errors {
-            let js_value: JsValue = error.into();
+            let js_value: JsValue = signal_error_to_js_value(error);
             assert!(js_value.is_string());
             let error_string = js_value.as_string().unwrap();
             assert!(error_string.contains("test"));
@@ -303,14 +303,14 @@ mod wasm_tests {
     fn test_sign_data_wasm() {
         let private_key = Uint8Array::from(&vec![42u8; 32][..]);
         let data = Uint8Array::from(&b"Hello, WASM signatures!"[..]);
-        
+
         let result = sign_data(&private_key, &data);
         assert!(result.is_ok());
-        
+
         let signature = result.unwrap();
-        assert_eq!(signature.length(), 32);
-        
-        // Test that same inputs produce same signature
+        assert_eq!(signature.length(), 64);
+
+        // Ed25519 signatures are deterministic, so same inputs produce same signature
         let result2 = sign_data(&private_key, &data).unwrap();
         let sig_bytes1: Vec<u8> = signature.to_vec();
         let sig_bytes2: Vec<u8> = result2.to_vec();
@@ -319,17 +319,26 @@ mod wasm_tests {
 
     #[wasm_bindgen_test]
     fn test_verify_signature_wasm() {
-        let public_key = Uint8Array::from(&vec![42u8; 32][..]);
+        use ed25519_dalek::SigningKey;
+
+        let private_key_bytes = [42u8; 32];
+        let signing_key = SigningKey::from_bytes(&private_key_bytes);
+        let public_key_bytes = signing_key.verifying_key().to_bytes();
+
+        let private_key = Uint8Array::from(&private_key_bytes[..]);
+        let public_key = Uint8Array::from(&public_key_bytes[..]);
         let data = Uint8Array::from(&b"Hello, WASM signatures!"[..]);
-        let signature = Uint8Array::from(&vec![123u8; 32][..]);
-        
+
+        let signature = sign_data(&private_key, &data).unwrap();
+        assert_eq!(signature.length(), 64);
+
         let result = verify_signature(&public_key, &signature, &data);
         assert!(result.is_ok());
-        
-        // The result should be a boolean
-        let is_valid = result.unwrap();
-        // This is a simplified signature scheme, so we expect it to work with matching keys
-        assert!(is_valid == true || is_valid == false); // Just test that we get a boolean
+        assert!(result.unwrap(), "valid Ed25519 signature must verify");
+
+        let wrong_data = Uint8Array::from(&b"tampered data"[..]);
+        let invalid = verify_signature(&public_key, &signature, &wrong_data).unwrap();
+        assert!(!invalid, "signature over different data must not verify");
     }
 
     // Test memory management functions
