@@ -5,7 +5,7 @@
 name = "signal-protocol-gallery"
 version = "0.1.0"
 edition = "2021"
-description = "Local Dioxus gallery demos for signal-protocol-core (not deployed)"
+description = "Dioxus gallery demos for signal-protocol-core (GitHub Pages + local serve)"
 license = "MIT OR Apache-2.0"
 publish = false
 default-run = "signal-protocol-gallery"

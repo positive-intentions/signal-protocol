@@ -1,0 +1,94 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: signal-protocol
+    steps:
+      # Dual checkout so signal-protocol-gallery's [patch] to ../../whatsup-ui resolves
+      # (same layout as a local positive-intentions/{signal-protocol,whatsup-ui} checkout).
+      - name: Checkout signal-protocol
+        uses: actions/checkout@v4
+        with:
+          path: signal-protocol
+
+      - name: Checkout whatsup-ui
+        uses: actions/checkout@v4
+        with:
+          repository: positive-intentions/whatsup-ui
+          path: whatsup-ui
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install nightly for branch coverage
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: signal-protocol -> target
+          key: pages-gallery
+
+      - name: Install cargo-binstall
+        run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
+      - name: Install dioxus-cli
+        run: cargo binstall dioxus-cli@0.6 --locked -y
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate coverage HTML for gallery
+        run: >
+          cargo +nightly llvm-cov --workspace --branch
+          --ignore-filename-regex 'src/rust/tests\.rs|src/rust/wasm_tests\.rs'
+          --html --output-dir signal-protocol-gallery/assets/coverage-html
+
+      # No base_path: custom domain (signal.positive-intentions.com) serves at site root.
+      - name: Build gallery
+        working-directory: signal-protocol/signal-protocol-gallery
+        run: dx build --release --platform web --bin signal-protocol-gallery
+
+      - name: Prepare Pages artifact
+        working-directory: signal-protocol/signal-protocol-gallery
+        run: |
+          OUT="target/dx/signal-protocol-gallery/release/web/public"
+          cp "$OUT/index.html" "$OUT/404.html"
+          touch "$OUT/.nojekyll"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: signal-protocol/signal-protocol-gallery/target/dx/signal-protocol-gallery/release/web/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
