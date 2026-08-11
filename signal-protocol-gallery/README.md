@@ -16,9 +16,10 @@ cd signal-protocol-gallery
 dx serve --bin signal-protocol-gallery --platform web
 ```
 
-## Coverage report
+## Coverage report (local only)
 
-Generate the llvm-cov HTML report (from the repo root), then open **Coverage** in the gallery sidebar (`/coverage`):
+Generate the llvm-cov HTML report from the repo root, then open the HTML file in a
+browser (not embedded in the gallery UI):
 
 ```bash
 # from signal-protocol repo root
@@ -28,9 +29,7 @@ npm run test:rust:coverage
 #   --ignore-filename-regex 'src/rust/tests\.rs|src/rust/wasm_tests\.rs' \
 #   --html --output-dir signal-protocol-gallery/assets/coverage-html
 
-cd signal-protocol-gallery
-dx serve --bin signal-protocol-gallery --platform web
-# open /coverage (sidebar Coverage link)
+# open signal-protocol-gallery/assets/coverage-html/html/index.html
 ```
 
 ## Run (desktop — optional)

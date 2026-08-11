@@ -3,7 +3,7 @@
 use dioxus::prelude::*;
 
 use whatsup_ui::call_state::CallController;
-use whatsup_ui::components::pages::{CoveragePage, GalleryHome, StoryView};
+use whatsup_ui::components::pages::{GalleryHome, StoryView};
 use whatsup_ui::components::templates::GalleryShell;
 use whatsup_ui::data::Theme;
 use whatsup_ui::gallery::GalleryHost;
@@ -13,15 +13,11 @@ use whatsup_ui::STYLES;
 
 use crate::stories::{GUI_STORIES, TUI_STORIES};
 
-const COVERAGE_REGENERATE_CMD: &str = "cargo +nightly llvm-cov --workspace --branch --ignore-filename-regex 'src/rust/tests\\.rs|src/rust/wasm_tests\\.rs' --html --output-dir signal-protocol-gallery/assets/coverage-html";
-
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
 pub enum Route {
     #[route("/")]
     Home {},
-    #[route("/coverage")]
-    Coverage {},
     #[route("/demo/:kind/:group/:name")]
     Demo { kind: String, group: String, name: String },
     #[route("/:..route")]
@@ -33,15 +29,6 @@ fn Home() -> Element {
     rsx! {
         GalleryShell { active_slug: String::new(),
             GalleryHome {}
-        }
-    }
-}
-
-#[component]
-fn Coverage() -> Element {
-    rsx! {
-        GalleryShell { active_slug: "coverage".to_string(),
-            CoveragePage {}
         }
     }
 }
@@ -75,12 +62,11 @@ pub fn App() -> Element {
             "signal-protocol",
             "Protocol gallery",
             "/",
-            Some("/coverage"),
+            None,
             |kind, group, name| format!("/demo/{kind}/{group}/{name}"),
             GUI_STORIES,
             TUI_STORIES,
         )
-        .with_coverage_regenerate_cmd(COVERAGE_REGENERATE_CMD)
     });
 
     let app_state = use_context_provider(|| Signal::new(AppState::mock()));

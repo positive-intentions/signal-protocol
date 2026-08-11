@@ -15,6 +15,7 @@
 
 [![Lint](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/lint.yml?branch=staging&label=Lint)](https://github.com/positive-intentions/signal-protocol/actions/workflows/lint.yml)
 [![Build](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/build.yml?branch=staging&label=Build)](https://github.com/positive-intentions/signal-protocol/actions/workflows/build.yml)
+[![Coverage](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/coverage.yml?branch=staging&label=Coverage)](https://github.com/positive-intentions/signal-protocol/actions/workflows/coverage.yml)
 
 </div>
 
@@ -64,16 +65,10 @@ bindings façade). Uses gallery chrome from [`whatsup-ui`](https://github.com/po
 This does **not** replace the React Storybook deploy — run it only locally.
 
 ```bash
-cd signal-protocol-gallery
-dx serve --bin signal-protocol-gallery --platform web
-```
-
-The gallery sidebar includes a **Coverage** link (`/coverage`) that embeds the llvm-cov
-HTML report. Generate it from the repo root first:
-
-```bash
-npm run test:rust:coverage
-# or: cargo +nightly llvm-cov --workspace --branch --html --output-dir signal-protocol-gallery/assets/coverage-html
+npm run start:gallery
+# or:
+# cd signal-protocol-gallery
+# dx serve --bin signal-protocol-gallery --platform web
 ```
 
 Desktop is optional and needs system packages (`libxdo-dev`, WebKitGTK, GTK). See
@@ -146,10 +141,10 @@ npm run test:wasm:node
 
 ### View Coverage
 
-**Rust (llvm-cov):** `npm run test:rust:coverage` writes HTML under
-`signal-protocol-gallery/assets/coverage-html/`. Open it in the gallery at `/coverage`,
-or open `signal-protocol-gallery/assets/coverage-html/html/index.html` directly.
-CI enforces 100% line coverage on the workspace (`npm run test:rust:coverage:ci`).
+**Rust (llvm-cov):** local HTML via `npm run test:rust:coverage`, then open
+`signal-protocol-gallery/assets/coverage-html/html/index.html`. CI enforces 100% line
+coverage on the workspace ([Coverage](https://github.com/positive-intentions/signal-protocol/actions/workflows/coverage.yml)
+workflow / `npm run test:rust:coverage:ci`).
 
 **Jest:** reports land in `coverage/` (`coverage/lcov-report/index.html`).
 

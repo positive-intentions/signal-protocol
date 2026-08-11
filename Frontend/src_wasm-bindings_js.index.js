@@ -25,7 +25,7 @@ eval("{\n\nfunction _typeof(o) { \"@babel/helpers - typeof\"; return _typeof = \
   \******************************************/
 (module, __unused_webpack_exports, __webpack_require__) {
 
-eval("{module.exports = __webpack_require__.p + \"267f86b93a9fb71e86b3.wasm\";\n\n//# sourceURL=webpack://signal-protocol/./pkg/signal_protocol_wasm_bg.wasm?\n}");
+eval("{module.exports = __webpack_require__.p + \"75b0379fb89a88f311f0.wasm\";\n\n//# sourceURL=webpack://signal-protocol/./pkg/signal_protocol_wasm_bg.wasm?\n}");
 
 /***/ },
 

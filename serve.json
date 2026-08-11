@@ -1,0 +1,14 @@
+{
+  "cleanUrls": false,
+  "directoryListing": false,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/demo/**",
+      "destination": "/index.html"
+    }
+  ]
+}

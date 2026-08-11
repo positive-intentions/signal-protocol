@@ -15,6 +15,7 @@
 
 [![Lint](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/lint.yml?branch=staging&label=Lint)](https://github.com/positive-intentions/signal-protocol/actions/workflows/lint.yml)
 [![Build](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/build.yml?branch=staging&label=Build)](https://github.com/positive-intentions/signal-protocol/actions/workflows/build.yml)
+[![Coverage](https://img.shields.io/github/actions/workflow/status/positive-intentions/signal-protocol/coverage.yml?branch=staging&label=Coverage)](https://github.com/positive-intentions/signal-protocol/actions/workflows/coverage.yml)
 
 </div>
 
@@ -52,9 +53,30 @@ This repository contains a complete implementation of the Signal Protocol crypto
 - **WebAssembly**: Compiled to WASM for browser and Node.js compatibility
 - **TypeScript/JavaScript Bindings**: Easy-to-use JavaScript API
 - **Storybook Demos**: Interactive browser-based demonstrations of all functionality
+- **Rust gallery (local)**: Dioxus demos over `signal-protocol-core` using `whatsup-ui` chrome
 - **Comprehensive Tests**: Unit tests for Rust, WASM, and JavaScript bindings
 - **Formal Verification**: hax/F\*, Rocq, Lean support for cryptographic proofs
 - **Docker Support**: Fully containerized development environment
+
+## Local Rust gallery (optional)
+
+Interactive protocol playgrounds that call **`signal-protocol-core` directly** (no WASM
+bindings façade). Uses gallery chrome from [`whatsup-ui`](https://github.com/positive-intentions/whatsup-ui).
+This does **not** replace the React Storybook deploy — run it only locally.
+
+```bash
+npm run start:gallery
+# or:
+# cd signal-protocol-gallery
+# dx serve --bin signal-protocol-gallery --platform web
+```
+
+Desktop is optional and needs system packages (`libxdo-dev`, WebKitGTK, GTK). See
+[`signal-protocol-gallery/README.md`](signal-protocol-gallery/README.md).
+
+Requires a recent Rust toolchain (see `signal-protocol-gallery/rust-toolchain.toml`).
+While `GalleryHost` lands on the default `whatsup-ui` branch, `Cargo.toml` patches the
+git dependency to a local `../whatsup-ui` checkout.
 
 ## Building
 
@@ -119,7 +141,12 @@ npm run test:wasm:node
 
 ### View Coverage
 
-Coverage reports are generated in the `coverage/` directory. Open `coverage/lcov-report/index.html` in a browser to view detailed coverage.
+**Rust (llvm-cov):** local HTML via `npm run test:rust:coverage`, then open
+`signal-protocol-gallery/assets/coverage-html/html/index.html`. CI enforces 100% line
+coverage on the workspace ([Coverage](https://github.com/positive-intentions/signal-protocol/actions/workflows/coverage.yml)
+workflow / `npm run test:rust:coverage:ci`).
+
+**Jest:** reports land in `coverage/` (`coverage/lcov-report/index.html`).
 
 ## Development
 

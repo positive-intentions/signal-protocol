@@ -1,163 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
-    <meta charset="utf-8" />
-
-    <title>storybook - Storybook</title>
+    <title>Signal Protocol Gallery</title>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    
-    <link rel="icon" type="image/x-icon" href="./favicon.ico" />
-    
-    <style>
-      @font-face {
-        font-family: 'Nunito Sans';
-        font-style: normal;
-        font-weight: 400;
-        font-display: swap;
-        src: url('./sb-common-assets/nunito-sans-regular.woff2') format('woff2');
-      }
-
-      @font-face {
-        font-family: 'Nunito Sans';
-        font-style: italic;
-        font-weight: 400;
-        font-display: swap;
-        src: url('./sb-common-assets/nunito-sans-italic.woff2') format('woff2');
-      }
-
-      @font-face {
-        font-family: 'Nunito Sans';
-        font-style: normal;
-        font-weight: 700;
-        font-display: swap;
-        src: url('./sb-common-assets/nunito-sans-bold.woff2') format('woff2');
-      }
-
-      @font-face {
-        font-family: 'Nunito Sans';
-        font-style: italic;
-        font-weight: 700;
-        font-display: swap;
-        src: url('./sb-common-assets/nunito-sans-bold-italic.woff2') format('woff2');
-      }
-    </style>
-
-    <link href="./sb-manager/runtime.js" rel="modulepreload" />
-
-    
-    <link href="./sb-addons/storybook-core-server-presets-0/common-manager-bundle.js" rel="modulepreload" />
-    
-    <link href="./sb-addons/links-1/manager-bundle.js" rel="modulepreload" />
-    
-    <link href="./sb-addons/docs-2/manager-bundle.js" rel="modulepreload" />
-    
-    <link href="./sb-addons/themes-3/manager-bundle.js" rel="modulepreload" />
-    
-    <link href="./sb-addons/storybook-4/manager-bundle.js" rel="modulepreload" />
-      <link rel="shortcut icon" href="/favicon.ico">
-<link rel="icon" type="image/png" href="/logo192.png" sizes="192x192">
-
-<title>positive-intentions</title> 
-
-    <style>
-      #storybook-root[hidden] {
-        display: none !important;
-      }
-    </style>
-
-    
-  </head>
+    <meta charset="UTF-8" />
+  <link rel="preload" as="script" href="/./assets/signal-protocol-gallery-c6cbfbbf07103f63.js" crossorigin><link rel="preload" as="fetch" type="application/wasm" href="/./assets/signal-protocol-gallery_bg-c5097276df9dadcc.wasm" crossorigin></head>
   <body>
-    <div id="root"></div>
-
-    
-    <script>
-      
-        
-          window['FEATURES'] = {
-  "argTypeTargetsV7": true,
-  "legacyDecoratorFileOrder": false,
-  "disallowImplicitActionsInRenderV8": true,
-  "viewport": true,
-  "highlight": true,
-  "controls": true,
-  "interactions": true,
-  "actions": true,
-  "backgrounds": true,
-  "outline": true,
-  "measure": true
-};
-        
-      
-        
-          window['REFS'] = {};
-        
-      
-        
-          window['LOGLEVEL'] = "info";
-        
-      
-        
-          window['DOCS_OPTIONS'] = {
-  "defaultName": "Docs"
-};
-        
-      
-        
-          window['CONFIG_TYPE'] = "PRODUCTION";
-        
-      
-        
-      
-        
-      
-        
-          window['TAGS_OPTIONS'] = {
-  "dev-only": {
-    "excludeFromDocsStories": true
-  },
-  "docs-only": {
-    "excludeFromSidebar": true
-  },
-  "test-only": {
-    "excludeFromSidebar": true,
-    "excludeFromDocsStories": true
-  }
-};
-        
-      
-        
-          window['STORYBOOK_RENDERER'] = "react";
-        
-      
-        
-          window['STORYBOOK_BUILDER'] = "@storybook/builder-webpack5";
-        
-      
-        
-          window['STORYBOOK_FRAMEWORK'] = "@storybook/react-webpack5";
-        
-      
-    </script>
-    
-
-    <script type="module">
-      import './sb-manager/globals-runtime.js';
-
-      
-        import './sb-addons/storybook-core-server-presets-0/common-manager-bundle.js';
-      
-        import './sb-addons/links-1/manager-bundle.js';
-      
-        import './sb-addons/docs-2/manager-bundle.js';
-      
-        import './sb-addons/themes-3/manager-bundle.js';
-      
-        import './sb-addons/storybook-4/manager-bundle.js';
-      
-
-      import './sb-manager/runtime.js';
-    </script>
-  </body>
+    <div id="main"></div>
+  <script>
+            // We can't use a module script here because we need to start the script immediately when streaming
+            import("/./assets/signal-protocol-gallery-c6cbfbbf07103f63.js").then(
+                ({ default: init }) => {
+                init("/./assets/signal-protocol-gallery_bg-c5097276df9dadcc.wasm").then((wasm) => {
+                    if (wasm.__wbindgen_start == undefined) {
+                    wasm.main();
+                    }
+                });
+                }
+            );
+            </script>
+            
+            </body>
 </html>
