@@ -51,31 +51,29 @@ This repository contains a complete implementation of the Signal Protocol crypto
 - **Rust Implementation**: High-performance, memory-safe cryptographic operations
 - **WebAssembly**: Compiled to WASM for browser and Node.js compatibility
 - **TypeScript/JavaScript Bindings**: Easy-to-use JavaScript API
-- **Rust gallery (GitHub Pages)**: Dioxus demos over `signal-protocol-core` using `whatsup-ui` chrome
-- **Storybook Demos (local)**: React/WASM interactive demos via `npm start`
+- **Storybook Demos**: Interactive browser-based demonstrations of all functionality
+- **Rust gallery (local)**: Dioxus demos over `signal-protocol-core` using `whatsup-ui` chrome
 - **Comprehensive Tests**: Unit tests for Rust, WASM, and JavaScript bindings
 - **Formal Verification**: hax/F\*, Rocq, Lean support for cryptographic proofs
 - **Docker Support**: Fully containerized development environment
 
-## Rust gallery (GitHub Pages)
+## Local Rust gallery (optional)
 
 Interactive protocol playgrounds that call **`signal-protocol-core` directly** (no WASM
 bindings façade). Uses gallery chrome from [`whatsup-ui`](https://github.com/positive-intentions/whatsup-ui).
+This does **not** replace the React Storybook deploy — run it only locally.
 
-**GitHub Pages** deploys this gallery (workflow
-[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)). The live demo
-is [signal.positive-intentions.com](https://signal.positive-intentions.com). After merging
-the workflow, set **Settings → Pages → Source** to **GitHub Actions** (one-time) if it still
-points at the `/docs` branch folder.
+```bash
+cd signal-protocol-gallery
+dx serve --bin signal-protocol-gallery --platform web
+```
 
-The sidebar **Coverage** link (`/coverage`) embeds the llvm-cov HTML report (generated in CI
-before the Pages build). Locally:
+The gallery sidebar includes a **Coverage** link (`/coverage`) that embeds the llvm-cov
+HTML report. Generate it from the repo root first:
 
 ```bash
 npm run test:rust:coverage
-cd signal-protocol-gallery
-dx serve --bin signal-protocol-gallery --platform web
-# open /coverage
+# or: cargo +nightly llvm-cov --workspace --branch --html --output-dir signal-protocol-gallery/assets/coverage-html
 ```
 
 Desktop is optional and needs system packages (`libxdo-dev`, WebKitGTK, GTK). See
@@ -84,15 +82,6 @@ Desktop is optional and needs system packages (`libxdo-dev`, WebKitGTK, GTK). Se
 Requires a recent Rust toolchain (see `signal-protocol-gallery/rust-toolchain.toml`).
 While `GalleryHost` lands on the default `whatsup-ui` branch, `Cargo.toml` patches the
 git dependency to a local `../whatsup-ui` checkout.
-
-## Storybook (local)
-
-React Storybook remains available for WASM/JS demos; it is **not** what Pages serves:
-
-```bash
-npm start
-# http://localhost:6006
-```
 
 ## Building
 
@@ -168,8 +157,13 @@ CI enforces 100% line coverage on the workspace (`npm run test:rust:coverage:ci`
 
 ### Storybook
 
-See [Storybook (local)](#storybook-local) above. `npm start` runs Storybook on
-`http://localhost:6006` for WASM/JS demos.
+Run Storybook to see interactive demos of all Signal Protocol functionality:
+
+```bash
+npm start
+```
+
+This starts Storybook on `http://localhost:6006` where you can test all WASM functionality in the browser.
 
 ### Watch Mode
 

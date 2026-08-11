@@ -1,15 +1,12 @@
 # signal-protocol-gallery
 
-Dioxus gallery for exercising [`signal-protocol-core`](../signal-protocol-core)
+Local-only Dioxus gallery for exercising [`signal-protocol-core`](../signal-protocol-core)
 through interactive demos. UI chrome comes from
 [`whatsup-ui`](https://github.com/positive-intentions/whatsup-ui) (`gallery` feature).
 
-**GitHub Pages** deploys this gallery (see
-[`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml)).
-The React Storybook app remains in the repo for local WASM/JS demos (`npm start`
-from the repo root) and is not what Pages serves.
+This crate is **not** part of the React Storybook / GitHub Pages deploy.
 
-Demos call **`signal-protocol-core` from Rust** (no `wasm-bindgen` façade). The
+Demos still call **`signal-protocol-core` from Rust** (no `wasm-bindgen` façade). The
 default target is **web** via Dioxus so you do not need GTK/WebKit desktop packages.
 
 ## Run (web — recommended)
@@ -35,9 +32,6 @@ cd signal-protocol-gallery
 dx serve --bin signal-protocol-gallery --platform web
 # open /coverage (sidebar Coverage link)
 ```
-
-On the deployed Pages site, coverage HTML is generated in CI before `dx build`, so
-`/coverage` works without a local regenerate step.
 
 ## Run (desktop — optional)
 
