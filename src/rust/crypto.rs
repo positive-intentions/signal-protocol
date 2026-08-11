@@ -15,6 +15,7 @@ use web_sys::console;
 ///
 /// This helper function bridges the gap between JavaScript typed arrays
 /// and Rust vectors, enabling seamless data transfer across the WASM boundary.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub(crate) fn uint8_array_to_vec(arr: &Uint8Array) -> Vec<u8> {
     arr.to_vec()
 }
@@ -23,6 +24,7 @@ pub(crate) fn uint8_array_to_vec(arr: &Uint8Array) -> Vec<u8> {
 ///
 /// **SECURITY NOTE**: Only logs non-sensitive operational information.
 /// Never logs keys, secrets, or other cryptographic material.
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -94,6 +96,7 @@ pub(crate) fn verify_signature_internal(
 /// ## Errors
 /// - Returns error if private key is not exactly 32 bytes
 /// - Returns error if signing operation fails
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn sign_data(private_key: &Uint8Array, data: &Uint8Array) -> Result<Uint8Array, JsValue> {
     log("Signing data with Ed25519");
@@ -139,6 +142,7 @@ pub fn sign_data(private_key: &Uint8Array, data: &Uint8Array) -> Result<Uint8Arr
 /// - Returns error if public key is not exactly 32 bytes
 /// - Returns error if signature is not exactly 64 bytes
 /// - Returns error if key format is invalid
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn verify_signature(
     public_key: &Uint8Array,
@@ -174,6 +178,7 @@ pub(crate) fn simple_verify(_public_key: &[u8], _signature: &[u8], _data: &[u8])
 
 #[cfg(test)]
 #[allow(dead_code)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::rust::keys::generate_identity_keypair;
@@ -185,6 +190,7 @@ mod tests {
     ///
     /// Tests that A(priv_a, pub_b) == B(priv_b, pub_a)
     /// This is a fundamental property of Diffie-Hellman key exchange
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_x25519_ecdh_commutativity() {
         // Generate two real X25519 key pairs
@@ -209,6 +215,7 @@ mod tests {
     }
 
     /// Test that different key pairs produce different shared secrets
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_x25519_ecdh_uniqueness() {
         let keypair_a = generate_identity_keypair().unwrap();
@@ -230,6 +237,7 @@ mod tests {
     }
 
     /// Test X25519 key validation
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_x25519_key_validation() {
         // Valid 32-byte key
@@ -244,6 +252,7 @@ mod tests {
     }
 
     /// Test Ed25519 signature creation and verification
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_ed25519_signatures() {
         // Generate a signing key pair
@@ -272,6 +281,7 @@ mod tests {
     }
 
     /// Test Ed25519 signature unforgeability
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_ed25519_unforgeability() {
         // Generate two different key pairs
@@ -302,6 +312,7 @@ mod tests {
     }
 
     /// Test Ed25519 deterministic signatures
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_ed25519_determinism() {
         let mut key_bytes = [42u8; 32];
@@ -323,6 +334,7 @@ mod tests {
     }
 
     /// Test error handling for invalid key sizes
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_invalid_key_sizes() {
         let short_key = Uint8Array::from(&[1u8; 16][..]); // Too short
@@ -343,6 +355,7 @@ mod tests {
     }
 
     /// Test error handling for invalid signature sizes
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_invalid_signature_size() {
         let mut key_bytes = [0u8; 32];
@@ -362,6 +375,7 @@ mod tests {
     }
 
     /// Test ECDH with invalid inputs
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_ecdh_invalid_inputs() {
         let valid_key = vec![1u8; 32];

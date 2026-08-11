@@ -621,6 +621,14 @@ mod native_tests {
 
     // Test X3DH functions
     #[test]
+    fn test_x3dh_internal_rejects_bad_key_length() {
+        let err = x3dh_initiate_internal(&[0u8; 16], &[0u8; 32], &[0u8; 32], &[0u8; 32], None);
+        assert!(err.is_err());
+        let err = x3dh_respond_internal(&[0u8; 16], &[0u8; 32], None, &[0u8; 32], &[0u8; 32]);
+        assert!(err.is_err());
+    }
+
+    #[test]
     fn test_x3dh_initiate_without_one_time_prekey() {
         // Generate keypairs for Alice and Bob
         let alice_identity = generate_x25519_keypair_internal();

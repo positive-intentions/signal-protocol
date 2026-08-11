@@ -144,6 +144,8 @@ target/
 ./pkg-web/
 
 coverage-rust/
+/lcov.info
+signal-protocol-gallery/assets/coverage-html/
 
 hax-upstream/
 hax/

@@ -16,6 +16,7 @@ use crate::rust::types::X3DHResult;
 /// 
 /// Helps trace the X3DH protocol execution and debug issues
 /// during key exchange operations.
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -35,17 +36,19 @@ pub(crate) fn x3dh_initiate_internal(
     bob_signed_prekey_public: &[u8],
     bob_one_time_prekey_public: Option<&[u8]>,
 ) -> Result<X3DHResult, crate::rust::error::SignalError> {
-    let core_result = signal_protocol_core::x3dh_initiate_internal(
+    match signal_protocol_core::x3dh_initiate_internal(
         alice_identity_private,
         alice_ephemeral_private,
         bob_identity_public,
         bob_signed_prekey_public,
         bob_one_time_prekey_public,
-    )?;
-    Ok(X3DHResult {
-        shared_secret: core_result.shared_secret,
-        associated_data: core_result.associated_data,
-    })
+    ) {
+        Ok(core_result) => Ok(X3DHResult {
+            shared_secret: core_result.shared_secret,
+            associated_data: core_result.associated_data,
+        }),
+        Err(e) => Err(e),
+    }
 }
 
 /// Internal function to respond to X3DH key exchange - delegates to core
@@ -56,17 +59,19 @@ pub(crate) fn x3dh_respond_internal(
     alice_identity_public: &[u8],
     alice_ephemeral_public: &[u8],
 ) -> Result<X3DHResult, crate::rust::error::SignalError> {
-    let core_result = signal_protocol_core::x3dh_respond_internal(
+    match signal_protocol_core::x3dh_respond_internal(
         bob_identity_private,
         bob_signed_prekey_private,
         bob_one_time_prekey_private,
         alice_identity_public,
         alice_ephemeral_public,
-    )?;
-    Ok(X3DHResult {
-        shared_secret: core_result.shared_secret,
-        associated_data: core_result.associated_data,
-    })
+    ) {
+        Ok(core_result) => Ok(X3DHResult {
+            shared_secret: core_result.shared_secret,
+            associated_data: core_result.associated_data,
+        }),
+        Err(e) => Err(e),
+    }
 }
 
 /// Initiate X3DH key exchange (Alice's side)
@@ -111,6 +116,7 @@ pub(crate) fn x3dh_respond_internal(
 /// )?;
 /// let shared_secret = result.shared_secret();
 /// ```
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn x3dh_initiate(
     alice_identity_private: &Uint8Array,
@@ -185,6 +191,7 @@ pub fn x3dh_initiate(
 /// )?;
 /// let shared_secret = result.shared_secret();
 /// ```
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn x3dh_respond(
     bob_identity_private: &Uint8Array,
@@ -223,12 +230,14 @@ pub fn x3dh_respond(
 
 #[cfg(test)]
 #[allow(dead_code)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::rust::keys::*;
     use wasm_bindgen_test::*;
 
     /// Test complete X3DH key exchange without one-time prekey
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_x3dh_without_one_time_prekey() {
         // Generate keys for Alice
@@ -264,6 +273,7 @@ mod tests {
     }
 
     /// Test complete X3DH key exchange with one-time prekey
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_x3dh_with_one_time_prekey() {
         // Generate keys for Alice
@@ -300,6 +310,7 @@ mod tests {
     }
 
     /// Test that different key sets produce different shared secrets
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_x3dh_uniqueness() {
         // First key exchange

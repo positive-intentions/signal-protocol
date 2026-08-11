@@ -1,0 +1,49 @@
+# Standalone package (not a member of the parent signal-protocol workspace).
+[workspace]
+
+[package]
+name = "signal-protocol-gallery"
+version = "0.1.0"
+edition = "2021"
+description = "Local Dioxus gallery demos for signal-protocol-core (not deployed)"
+license = "MIT OR Apache-2.0"
+publish = false
+default-run = "signal-protocol-gallery"
+
+[[bin]]
+name = "signal-protocol-gallery"
+path = "src/main.rs"
+required-features = ["gui"]
+
+[dependencies]
+dioxus = { version = "0.6.0", features = ["router"], optional = true }
+signal-protocol-core = { path = "../signal-protocol-core" }
+whatsup-ui = { git = "https://github.com/positive-intentions/whatsup-ui", default-features = false, features = [
+  "gallery",
+] }
+hex = "0.4"
+# Enable browser RNG for wasm (pulled in by rand via signal-protocol-core).
+getrandom = { version = "0.2", features = ["js"], optional = true }
+
+[features]
+default = ["web"]
+gui = ["dep:dioxus"]
+web = ["gui", "dioxus/web", "whatsup-ui/web", "dep:getrandom"]
+# Needs system libs: libxdo-dev, libwebkit2gtk-4.1-dev, libgtk-3-dev, …
+desktop = ["gui", "dioxus/desktop", "whatsup-ui/desktop"]
+
+# Use the local whatsup-ui checkout until GalleryHost lands on the default branch.
+[patch."https://github.com/positive-intentions/whatsup-ui"]
+whatsup-ui = { path = "../../whatsup-ui" }
+
+[profile]
+
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+
+[profile.server-dev]
+inherits = "dev"
+
+[profile.android-dev]
+inherits = "dev"

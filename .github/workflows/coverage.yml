@@ -1,0 +1,46 @@
+name: Coverage
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [staging]
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Rust llvm-cov (100% lines)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Branch coverage needs -Z coverage-options=branch (nightly only).
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: coverage-nightly
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate lcov and enforce line gate
+        run: >
+          cargo +nightly llvm-cov --workspace --branch
+          --ignore-filename-regex 'src/rust/tests\.rs|src/rust/wasm_tests\.rs'
+          --fail-under-lines 100
+          --lcov --output-path lcov.info
+          --summary-only
+
+      - name: Upload lcov
+        uses: actions/upload-artifact@v4
+        with:
+          name: lcov
+          path: lcov.info

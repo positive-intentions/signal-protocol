@@ -73,3 +73,79 @@ pub fn x3dh_respond_internal(
         associated_data: associated_data.to_vec(),
     })
 }
+
+#[cfg(all(test, feature = "crypto-backend"))]
+mod tests {
+    use super::*;
+    use crate::keys::{
+        generate_ephemeral_keypair, generate_identity_keypair, generate_one_time_prekey,
+        generate_signed_prekey,
+    };
+
+    #[test]
+    fn x3dh_symmetric_with_otpk() {
+        let alice_id = generate_identity_keypair();
+        let alice_eph = generate_ephemeral_keypair();
+        let bob_id = generate_identity_keypair();
+        let bob_spk = generate_signed_prekey();
+        let bob_otpk = generate_one_time_prekey();
+
+        let init = x3dh_initiate_internal(
+            &alice_id.private_key,
+            &alice_eph.private_key,
+            &bob_id.public_key,
+            &bob_spk.public_key,
+            Some(&bob_otpk.public_key),
+        )
+        .unwrap();
+
+        let resp = x3dh_respond_internal(
+            &bob_id.private_key,
+            &bob_spk.private_key,
+            Some(&bob_otpk.private_key),
+            &alice_id.public_key,
+            &alice_eph.public_key,
+        )
+        .unwrap();
+
+        assert_eq!(init.shared_secret, resp.shared_secret);
+        assert_eq!(init.associated_data, b"X3DH_Key_Exchange");
+        assert_eq!(resp.associated_data, b"X3DH_Key_Exchange");
+    }
+
+    #[test]
+    fn x3dh_symmetric_without_otpk() {
+        let alice_id = generate_identity_keypair();
+        let alice_eph = generate_ephemeral_keypair();
+        let bob_id = generate_identity_keypair();
+        let bob_spk = generate_signed_prekey();
+
+        let init = x3dh_initiate_internal(
+            &alice_id.private_key,
+            &alice_eph.private_key,
+            &bob_id.public_key,
+            &bob_spk.public_key,
+            None,
+        )
+        .unwrap();
+
+        let resp = x3dh_respond_internal(
+            &bob_id.private_key,
+            &bob_spk.private_key,
+            None,
+            &alice_id.public_key,
+            &alice_eph.public_key,
+        )
+        .unwrap();
+
+        assert_eq!(init.shared_secret, resp.shared_secret);
+        assert_eq!(init.shared_secret.len(), 32);
+    }
+
+    #[test]
+    fn x3dh_bad_key_length() {
+        let err = x3dh_initiate_internal(&[0u8; 16], &[0u8; 32], &[0u8; 32], &[0u8; 32], None)
+            .unwrap_err();
+        assert!(matches!(err, SignalError::InvalidInput(_)));
+    }
+}

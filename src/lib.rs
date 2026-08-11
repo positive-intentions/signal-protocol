@@ -4,6 +4,8 @@
 //! for use in web browsers and Node.js applications. The implementation provides all
 //! core Signal Protocol functionality including key generation, X3DH key exchange,
 //! and message encryption with forward secrecy.
+
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 //!
 //! ## Features
 //!

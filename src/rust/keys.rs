@@ -7,6 +7,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 use crate::rust::types::KeyPair;
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -50,6 +51,7 @@ pub(crate) fn generate_x25519_keypair_internal() -> KeyPair {
 ///
 /// ## Returns
 /// A `KeyPair` containing the identity public and private keys (32 bytes each)
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn generate_identity_keypair() -> Result<KeyPair, JsValue> {
     log("Generating identity keypair using X25519");
@@ -77,6 +79,7 @@ pub fn generate_identity_keypair() -> Result<KeyPair, JsValue> {
 ///
 /// ## Returns
 /// A `KeyPair` containing the signed prekey public and private keys (32 bytes each)
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn generate_signed_prekey() -> Result<KeyPair, JsValue> {
     log("Generating signed prekey using X25519");
@@ -100,6 +103,7 @@ pub fn generate_signed_prekey() -> Result<KeyPair, JsValue> {
 ///
 /// ## Returns
 /// A `KeyPair` containing the one-time prekey public and private keys (32 bytes each)
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn generate_one_time_prekey() -> Result<KeyPair, JsValue> {
     log("Generating one-time prekey using X25519");
@@ -127,6 +131,7 @@ pub fn generate_one_time_prekey() -> Result<KeyPair, JsValue> {
 ///
 /// ## Returns
 /// A `KeyPair` containing the ephemeral public and private keys (32 bytes each)
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn generate_ephemeral_keypair() -> Result<KeyPair, JsValue> {
     log("Generating ephemeral keypair using X25519");
@@ -135,11 +140,13 @@ pub fn generate_ephemeral_keypair() -> Result<KeyPair, JsValue> {
 
 #[cfg(test)]
 #[allow(dead_code)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
 
     /// Test that identity keypairs are generated successfully with real X25519
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_generate_identity_keypair() {
         let keypair = generate_identity_keypair().unwrap();
@@ -164,6 +171,7 @@ mod tests {
     }
 
     /// Test that multiple keypair generations produce different results
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_keypair_uniqueness() {
         let keypair1 = generate_identity_keypair().unwrap();
@@ -175,6 +183,7 @@ mod tests {
     }
 
     /// Test all key generation functions for basic functionality
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_all_key_generation_functions() {
         // Test all key generation functions

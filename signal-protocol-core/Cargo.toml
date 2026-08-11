@@ -26,7 +26,7 @@ serde = { version = "1.0", features = ["derive"] }
 hax-lib = "0.3"
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(hax_compilation)"] }
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(hax_compilation)", "cfg(coverage_nightly)"] }
 
 [features]
 default = ["crypto-backend"]

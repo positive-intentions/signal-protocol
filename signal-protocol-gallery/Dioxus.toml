@@ -1,0 +1,18 @@
+[application]
+name = "signal-protocol-gallery"
+default_platform = "web"
+asset_dir = "assets"
+
+[web.app]
+title = "Signal Protocol Gallery"
+
+[web.watcher]
+reload_html = true
+watch_path = ["src", "assets"]
+index_on_404 = true
+
+[bundle]
+identifier = "com.positiveintentions.signal-protocol-gallery"
+publisher = "positive-intentions"
+short_description = "Local Signal Protocol demos using signal-protocol-core"
+category = "DeveloperTool"

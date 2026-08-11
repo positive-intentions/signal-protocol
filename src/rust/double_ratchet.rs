@@ -10,6 +10,7 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -86,28 +87,34 @@ pub struct DoubleRatchetState {
     pub skipped_message_keys: BTreeMap<String, Vec<u8>>,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 impl DoubleRatchetState {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(constructor)]
     pub fn new() -> DoubleRatchetState {
         core_to_wasm_state(signal_protocol_core::DoubleRatchetState::new())
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn root_key(&self) -> Uint8Array {
         Uint8Array::from(&self.root_key[..])
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn sending_message_number(&self) -> u32 {
         self.sending_message_number
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn receiving_message_number(&self) -> u32 {
         self.receiving_message_number
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn skipped_keys_count(&self) -> usize {
         self.skipped_message_keys.len()
@@ -127,29 +134,35 @@ pub struct DoubleRatchetMessage {
     pub previous_chain_length: u32,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 impl DoubleRatchetMessage {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn ciphertext(&self) -> Uint8Array {
         Uint8Array::from(&self.ciphertext[..])
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn dh_public_key(&self) -> Uint8Array {
         Uint8Array::from(&self.dh_public_key[..])
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn message_number(&self) -> u32 {
         self.message_number
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn previous_chain_length(&self) -> u32 {
         self.previous_chain_length
     }
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn initialize_double_ratchet(
     shared_secret: &Uint8Array,
@@ -179,6 +192,7 @@ pub(crate) fn derive_next_chain_key(
     signal_protocol_core::derive_next_chain_key(chain_key)
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn double_ratchet_encrypt(
     state: &mut DoubleRatchetState,
@@ -202,6 +216,7 @@ pub fn double_ratchet_encrypt(
     })
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn double_ratchet_decrypt(
     state: &mut DoubleRatchetState,
@@ -222,6 +237,7 @@ pub fn double_ratchet_decrypt(
     Ok(Uint8Array::from(&plaintext[..]))
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn cleanup_skipped_message_keys(state: &mut DoubleRatchetState, max_keys: usize) -> usize {
     log(&format!(
@@ -315,6 +331,7 @@ pub(crate) fn double_ratchet_decrypt_internal(
 
 #[cfg(test)]
 #[allow(dead_code)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
@@ -322,6 +339,7 @@ mod tests {
     use crate::rust::keys::*;
     use crate::rust::x3dh::x3dh_initiate;
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_double_ratchet_initialization() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -337,6 +355,7 @@ mod tests {
         assert!(bob_state.sending_chain_key.is_none());
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_message_key_derivation() {
         let chain_key = [1u8; 32];
@@ -349,6 +368,7 @@ mod tests {
         assert_ne!(message_key, different_message_key);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_chain_key_advancement() {
         let chain_key = [1u8; 32];
@@ -361,6 +381,7 @@ mod tests {
         assert_ne!(next_chain_key, third_chain_key);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_double_ratchet_encrypt_decrypt() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -377,6 +398,7 @@ mod tests {
         assert_eq!(bob_state.receiving_message_number, 1);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_aad_functionality() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -395,6 +417,7 @@ mod tests {
         assert_eq!(decrypted_text, "Test message with AAD");
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_aad_tampering_protection() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -411,6 +434,7 @@ mod tests {
         assert!(ciphertext.len() >= 12 + 16);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_bidirectional_multiple_ratchet_steps() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -442,6 +466,7 @@ mod tests {
     //     ratchet step ahead of the peer, so the root_keys intentionally
     //     diverge. Previously this test asserted the opposite, which is
     //     mathematically impossible for any correct DR implementation.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_root_key_invariants_after_init() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -453,6 +478,7 @@ mod tests {
         assert_eq!(alice_root, vec![1u8; 32], "initial root equals shared_secret");
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_send_does_not_advance_root_key() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -467,6 +493,7 @@ mod tests {
         assert_eq!(before, after, "encrypt must not advance root_key");
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_receive_advances_root_key_and_diverges() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -510,6 +537,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_decryption_survives_root_key_divergence() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -542,6 +570,7 @@ mod tests {
         assert_eq!(String::from_utf8(dec3.to_vec()).unwrap(), "Message 3");
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_out_of_order_messages() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -566,6 +595,7 @@ mod tests {
         assert_eq!(bob_state.skipped_keys_count(), 0);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_skipped_key_cleanup() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -584,6 +614,7 @@ mod tests {
         assert!(bob_state.skipped_keys_count() <= 3);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_error_conditions() {
         let short_secret = Uint8Array::from(&[1u8; 16][..]);
@@ -595,6 +626,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_integration_with_x3dh() {
         let alice_identity = generate_identity_keypair().unwrap();

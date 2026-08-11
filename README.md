@@ -52,9 +52,36 @@ This repository contains a complete implementation of the Signal Protocol crypto
 - **WebAssembly**: Compiled to WASM for browser and Node.js compatibility
 - **TypeScript/JavaScript Bindings**: Easy-to-use JavaScript API
 - **Storybook Demos**: Interactive browser-based demonstrations of all functionality
+- **Rust gallery (local)**: Dioxus demos over `signal-protocol-core` using `whatsup-ui` chrome
 - **Comprehensive Tests**: Unit tests for Rust, WASM, and JavaScript bindings
 - **Formal Verification**: hax/F\*, Rocq, Lean support for cryptographic proofs
 - **Docker Support**: Fully containerized development environment
+
+## Local Rust gallery (optional)
+
+Interactive protocol playgrounds that call **`signal-protocol-core` directly** (no WASM
+bindings façade). Uses gallery chrome from [`whatsup-ui`](https://github.com/positive-intentions/whatsup-ui).
+This does **not** replace the React Storybook deploy — run it only locally.
+
+```bash
+cd signal-protocol-gallery
+dx serve --bin signal-protocol-gallery --platform web
+```
+
+The gallery sidebar includes a **Coverage** link (`/coverage`) that embeds the llvm-cov
+HTML report. Generate it from the repo root first:
+
+```bash
+npm run test:rust:coverage
+# or: cargo +nightly llvm-cov --workspace --branch --html --output-dir signal-protocol-gallery/assets/coverage-html
+```
+
+Desktop is optional and needs system packages (`libxdo-dev`, WebKitGTK, GTK). See
+[`signal-protocol-gallery/README.md`](signal-protocol-gallery/README.md).
+
+Requires a recent Rust toolchain (see `signal-protocol-gallery/rust-toolchain.toml`).
+While `GalleryHost` lands on the default `whatsup-ui` branch, `Cargo.toml` patches the
+git dependency to a local `../whatsup-ui` checkout.
 
 ## Building
 
@@ -119,7 +146,12 @@ npm run test:wasm:node
 
 ### View Coverage
 
-Coverage reports are generated in the `coverage/` directory. Open `coverage/lcov-report/index.html` in a browser to view detailed coverage.
+**Rust (llvm-cov):** `npm run test:rust:coverage` writes HTML under
+`signal-protocol-gallery/assets/coverage-html/`. Open it in the gallery at `/coverage`,
+or open `signal-protocol-gallery/assets/coverage-html/html/index.html` directly.
+CI enforces 100% line coverage on the workspace (`npm run test:rust:coverage:ci`).
+
+**Jest:** reports land in `coverage/` (`coverage/lcov-report/index.html`).
 
 ## Development
 

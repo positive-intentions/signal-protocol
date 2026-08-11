@@ -3,6 +3,8 @@
 //! This crate contains the core protocol logic without WASM bindings.
 //! It is designed for extraction to F* via hax for formal verification.
 
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
 pub mod crypto;
 pub mod double_ratchet;
 pub mod error;

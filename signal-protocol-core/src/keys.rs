@@ -54,3 +54,31 @@ pub fn generate_one_time_prekey() -> KeyPair {
 pub fn generate_ephemeral_keypair() -> KeyPair {
     generate_x25519_keypair_internal()
 }
+
+#[cfg(all(test, feature = "crypto-backend"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_generators_produce_32_byte_keys() {
+        for kp in [
+            generate_identity_keypair(),
+            generate_signed_prekey(),
+            generate_one_time_prekey(),
+            generate_ephemeral_keypair(),
+            generate_x25519_keypair_internal(),
+        ] {
+            assert_eq!(kp.public_key.len(), 32);
+            assert_eq!(kp.private_key.len(), 32);
+            assert_ne!(kp.public_key, kp.private_key);
+        }
+    }
+
+    #[test]
+    fn generators_are_unique() {
+        let a = generate_identity_keypair();
+        let b = generate_identity_keypair();
+        assert_ne!(a.private_key, b.private_key);
+        assert_ne!(a.public_key, b.public_key);
+    }
+}

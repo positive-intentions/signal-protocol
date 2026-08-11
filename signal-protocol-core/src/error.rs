@@ -30,3 +30,38 @@ impl std::fmt::Display for SignalError {
 }
 
 impl std::error::Error for SignalError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_all_variants() {
+        let cases = [
+            (
+                SignalError::KeyGeneration("k".into()),
+                "Key generation failed: k",
+            ),
+            (
+                SignalError::SignatureVerification("s".into()),
+                "Signature verification failed: s",
+            ),
+            (SignalError::KeyExchange("x".into()), "Key exchange failed: x"),
+            (SignalError::Encryption("e".into()), "Encryption failed: e"),
+            (SignalError::Decryption("d".into()), "Decryption failed: d"),
+            (
+                SignalError::KeyDerivation("h".into()),
+                "Key derivation failed: h",
+            ),
+            (
+                SignalError::Serialization("z".into()),
+                "Serialization failed: z",
+            ),
+            (SignalError::InvalidInput("i".into()), "Invalid input: i"),
+        ];
+        for (err, expected) in cases {
+            assert_eq!(err.to_string(), expected);
+            let _: &dyn std::error::Error = &err;
+        }
+    }
+}

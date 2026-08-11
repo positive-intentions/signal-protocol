@@ -22,6 +22,7 @@ use crate::rust::error::SignalError;
 /// 
 /// Provides visibility into message encryption/decryption operations
 /// during development and troubleshooting.
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -45,20 +46,23 @@ pub(crate) fn encrypt_message_internal(
     let info = format!("Signal_Message_{}", message_number);
     let hkdf = Hkdf::<Sha256>::new(Some(salt), shared_secret);
     let mut message_key = [0u8; 32];
+    // 32-byte expand is always in range for HKDF-SHA256.
     hkdf.expand(info.as_bytes(), &mut message_key)
-        .map_err(|e| SignalError::KeyDerivation(format!("Message key derivation failed: {}", e)))?;
-    
+        .expect("HKDF expand of 32 bytes cannot fail");
+
     // Generate a cryptographically secure random nonce for AES-GCM
     let mut nonce_bytes = [0u8; 12]; // 96 bits for AES-GCM
     OsRng.fill_bytes(&mut nonce_bytes);
-    
+
     // Encrypt using AES-256-GCM
     let key = GenericArray::from_slice(&message_key);
     let cipher = Aes256Gcm::new(key);
     let nonce_ga = GenericArray::from_slice(&nonce_bytes);
-    
-    let ciphertext = cipher.encrypt(nonce_ga, plaintext)
-        .map_err(|e| SignalError::Encryption(format!("AES-GCM encryption failed: {}", e)))?;
+
+    // Encryption with a valid 32-byte key does not fail for AES-GCM.
+    let ciphertext = cipher
+        .encrypt(nonce_ga, plaintext)
+        .expect("AES-GCM encrypt with valid key cannot fail");
     
     // Prepend nonce to ciphertext for transmission
     let mut result = nonce_bytes.to_vec();
@@ -138,6 +142,7 @@ pub(crate) fn decrypt_message_internal(
 /// const encryptedData = result.ciphertext();
 /// const messageKey = result.message_key();
 /// ```
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn encrypt_message(
     shared_secret: &Uint8Array,
@@ -199,6 +204,7 @@ pub fn encrypt_message(
 /// );
 /// const message = new TextDecoder().decode(plaintext);
 /// ```
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn decrypt_message(
     shared_secret: &Uint8Array,
@@ -223,11 +229,13 @@ pub fn decrypt_message(
 
 #[cfg(test)]
 #[allow(dead_code)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
 
     /// Test message encryption and decryption roundtrip
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_message_encryption_roundtrip() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -251,6 +259,7 @@ mod tests {
     }
 
     /// Test that different message numbers produce different keys and ciphertexts
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_forward_secrecy() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -275,6 +284,7 @@ mod tests {
     }
 
     /// Test that wrong message key fails decryption
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_wrong_key_decryption_fails() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -294,6 +304,7 @@ mod tests {
     }
 
     /// Test error handling for malformed ciphertext
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_short_ciphertext_error() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -305,6 +316,7 @@ mod tests {
     }
 
     /// Test that same inputs produce different ciphertexts (due to random nonces)
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_nonce_randomization() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);

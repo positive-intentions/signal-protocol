@@ -203,3 +203,80 @@ pub fn verify_signature_internal(
     Ok(true)
 }
 
+#[cfg(all(test, feature = "crypto-backend"))]
+mod tests {
+    use super::*;
+    use crate::keys::generate_identity_keypair;
+    use ed25519_dalek::SigningKey;
+    use rand::RngCore;
+
+    fn ed25519_keypair() -> (Vec<u8>, Vec<u8>) {
+        let mut seed = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut seed);
+        let signing = SigningKey::from_bytes(&seed);
+        (
+            signing.to_bytes().to_vec(),
+            signing.verifying_key().to_bytes().to_vec(),
+        )
+    }
+
+    #[test]
+    fn validate_x25519_public_key_ok_and_bad_len() {
+        let kp = generate_identity_keypair();
+        assert!(validate_x25519_public_key(&kp.public_key).is_ok());
+        assert!(validate_x25519_public_key(&[0u8; 16]).is_err());
+    }
+
+    #[test]
+    fn ecdh_roundtrip_and_errors() {
+        let a = generate_identity_keypair();
+        let b = generate_identity_keypair();
+        let ab = simple_ecdh(&a.private_key, &b.public_key).unwrap();
+        let ba = x25519_ecdh(&b.private_key, &a.public_key).unwrap();
+        assert_eq!(ab, ba);
+        assert_eq!(ab.len(), 32);
+
+        assert!(x25519_ecdh(&[0u8; 16], &b.public_key).is_err());
+        assert!(x25519_ecdh(&a.private_key, &[0u8; 16]).is_err());
+    }
+
+    #[test]
+    fn hkdf_derive_ok_and_too_long() {
+        let out = hkdf_derive(b"salt", b"ikm", b"info", 32).unwrap();
+        assert_eq!(out.len(), 32);
+        // HKDF-SHA256 expand max is 255 * hash_len
+        let err = hkdf_derive(b"salt", b"ikm", b"info", 255 * 32 + 1).unwrap_err();
+        assert!(matches!(err, SignalError::KeyDerivation(_)));
+    }
+
+    #[test]
+    fn sign_and_verify_roundtrip() {
+        let (sk, pk) = ed25519_keypair();
+        let data = b"hello signal";
+        let sig = sign_data_internal(&sk, data).unwrap();
+        assert_eq!(sig.len(), 64);
+        assert!(verify_signature_internal(&pk, &sig, data).unwrap());
+        assert!(!verify_signature_internal(&pk, &sig, b"tampered").unwrap());
+    }
+
+    #[test]
+    fn sign_verify_input_errors() {
+        assert!(sign_data_internal(&[0u8; 16], b"x").is_err());
+        assert!(verify_signature_internal(&[0u8; 16], &[0u8; 64], b"x").is_err());
+        assert!(verify_signature_internal(&[0u8; 32], &[0u8; 32], b"x").is_err());
+        // Find a 32-byte encoding rejected by Ed25519 (SignatureVerification).
+        let mut found = false;
+        for b in 0u8..=255 {
+            let mut pk = [0u8; 32];
+            pk.fill(b);
+            if let Err(SignalError::SignatureVerification(_)) =
+                verify_signature_internal(&pk, &[0u8; 64], b"x")
+            {
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "expected at least one invalid Ed25519 public key encoding");
+    }
+}
+

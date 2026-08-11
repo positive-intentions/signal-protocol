@@ -51,3 +51,41 @@ impl EncryptionResult {
         &self.message_key
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keypair_accessors() {
+        let kp = KeyPair {
+            public_key: vec![1, 2, 3],
+            private_key: vec![4, 5, 6],
+        };
+        assert_eq!(kp.public_key(), &[1, 2, 3]);
+        assert_eq!(kp.private_key(), &[4, 5, 6]);
+        let _ = format!("{:?}", kp.clone());
+    }
+
+    #[test]
+    fn x3dh_result_accessors() {
+        let r = X3DHResult {
+            shared_secret: vec![9],
+            associated_data: vec![8],
+        };
+        assert_eq!(r.shared_secret(), &[9]);
+        assert_eq!(r.associated_data(), &[8]);
+        let _ = format!("{:?}", r.clone());
+    }
+
+    #[test]
+    fn encryption_result_accessors() {
+        let r = EncryptionResult {
+            ciphertext: vec![7],
+            message_key: vec![6],
+        };
+        assert_eq!(r.ciphertext(), &[7]);
+        assert_eq!(r.message_key(), &[6]);
+        let _ = format!("{:?}", r.clone());
+    }
+}

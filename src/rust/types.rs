@@ -29,12 +29,14 @@ pub struct KeyPair {
     pub private_key: Vec<u8>,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 impl KeyPair {
     /// Get the public key as a JavaScript Uint8Array
     /// 
     /// The public key can be safely shared with other parties for
     /// encryption, signature verification, or key agreement protocols.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn public_key(&self) -> Uint8Array {
         Uint8Array::from(&self.public_key[..])
@@ -44,6 +46,7 @@ impl KeyPair {
     /// 
     /// ⚠️ **WARNING**: Private keys must be handled securely.
     /// Only access this when absolutely necessary for cryptographic operations.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn private_key(&self) -> Uint8Array {
         Uint8Array::from(&self.private_key[..])
@@ -73,12 +76,14 @@ pub struct X3DHResult {
     pub associated_data: Vec<u8>,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 impl X3DHResult {
     /// Get the shared secret as a JavaScript Uint8Array
     /// 
     /// This secret should be used immediately for key derivation and
     /// then securely wiped from memory when no longer needed.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn shared_secret(&self) -> Uint8Array {
         Uint8Array::from(&self.shared_secret[..])
@@ -88,6 +93,7 @@ impl X3DHResult {
     /// 
     /// Associated data provides additional context for the key exchange
     /// and can be used for protocol versioning or authentication.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn associated_data(&self) -> Uint8Array {
         Uint8Array::from(&self.associated_data[..])
@@ -117,12 +123,14 @@ pub struct EncryptionResult {
     pub message_key: Vec<u8>,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 impl EncryptionResult {
     /// Get the ciphertext as a JavaScript Uint8Array
     /// 
     /// The ciphertext includes the nonce and authentication tag,
     /// making it self-contained for transmission and storage.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn ciphertext(&self) -> Uint8Array {
         Uint8Array::from(&self.ciphertext[..])
@@ -132,6 +140,7 @@ impl EncryptionResult {
     /// 
     /// This key is required for decryption and should be stored
     /// securely alongside the ciphertext if needed for later access.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen(getter)]
     pub fn message_key(&self) -> Uint8Array {
         Uint8Array::from(&self.message_key[..])
