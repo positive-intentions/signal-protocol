@@ -38,34 +38,30 @@ pub mod rust;
 
 // Re-export all public types and functions for JavaScript access
 pub use rust::{
-    SignalError,
-    KeyPair, X3DHResult, EncryptionResult,
-    generate_identity_keypair, generate_signed_prekey, 
-    generate_one_time_prekey, generate_ephemeral_keypair,
-    sign_data, verify_signature,
-    x3dh_initiate, x3dh_respond,
-    encrypt_message, decrypt_message,
-    serialize_public_key, deserialize_public_key,
-    hkdf_derive_key, free_keypair, free_buffer
+    decrypt_message, deserialize_public_key, encrypt_message, free_buffer, free_keypair,
+    generate_ephemeral_keypair, generate_identity_keypair, generate_one_time_prekey,
+    generate_signed_prekey, hkdf_derive_key, serialize_public_key, sign_data, verify_signature,
+    x3dh_initiate, x3dh_respond, EncryptionResult, KeyPair, SignalError, X3DHResult,
 };
 
-
 /// Initialize the WASM module
-/// 
+///
 /// This function is automatically called when the WASM module is loaded.
 /// It sets up error handling and logging for better debugging experience.
 #[wasm_bindgen(start)]
 #[cfg(not(test))]
 pub fn main() {
     // Log module initialization to browser console
-    console::log_1(&JsValue::from_str("Signal Protocol WASM module initialized"));
-    
+    console::log_1(&JsValue::from_str(
+        "Signal Protocol WASM module initialized",
+    ));
+
     // Set up panic hook for better error messages in development
     console_error_panic_hook::set_once();
 }
 
 /// Initialize the WASM module for tests
-/// 
+///
 /// This is a separate test-only initialization to avoid main symbol conflicts.
 #[cfg(test)]
 pub fn init_for_test() {

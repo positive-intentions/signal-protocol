@@ -475,7 +475,11 @@ mod tests {
         let alice_root = alice_state.root_key().to_vec();
         let bob_root = bob_state.root_key().to_vec();
         assert_eq!(alice_root, bob_root, "roots must match at init");
-        assert_eq!(alice_root, vec![1u8; 32], "initial root equals shared_secret");
+        assert_eq!(
+            alice_root,
+            vec![1u8; 32],
+            "initial root equals shared_secret"
+        );
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -484,11 +488,9 @@ mod tests {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
         let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
         let before = alice_state.root_key().to_vec();
-        let _enc = double_ratchet_encrypt(
-            &mut alice_state,
-            &Uint8Array::from("Message 1".as_bytes()),
-        )
-        .unwrap();
+        let _enc =
+            double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 1".as_bytes()))
+                .unwrap();
         let after = alice_state.root_key().to_vec();
         assert_eq!(before, after, "encrypt must not advance root_key");
     }
@@ -501,11 +503,9 @@ mod tests {
         let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
         let initial_root = alice_state.root_key().to_vec();
 
-        let enc1 = double_ratchet_encrypt(
-            &mut alice_state,
-            &Uint8Array::from("Message 1".as_bytes()),
-        )
-        .unwrap();
+        let enc1 =
+            double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 1".as_bytes()))
+                .unwrap();
         let _ = double_ratchet_decrypt(&mut bob_state, &enc1).unwrap();
 
         let bob_root_after_recv = bob_state.root_key().to_vec();
@@ -519,11 +519,9 @@ mod tests {
             "Alice's root unchanged until she receives"
         );
 
-        let enc2 = double_ratchet_encrypt(
-            &mut bob_state,
-            &Uint8Array::from("Message 2".as_bytes()),
-        )
-        .unwrap();
+        let enc2 =
+            double_ratchet_encrypt(&mut bob_state, &Uint8Array::from("Message 2".as_bytes()))
+                .unwrap();
         let _ = double_ratchet_decrypt(&mut alice_state, &enc2).unwrap();
 
         let alice_root_after_recv = alice_state.root_key().to_vec();
@@ -544,28 +542,22 @@ mod tests {
         let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
         let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
 
-        let enc1 = double_ratchet_encrypt(
-            &mut alice_state,
-            &Uint8Array::from("Message 1".as_bytes()),
-        )
-        .unwrap();
+        let enc1 =
+            double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 1".as_bytes()))
+                .unwrap();
         let dec1 = double_ratchet_decrypt(&mut bob_state, &enc1).unwrap();
         assert_eq!(String::from_utf8(dec1.to_vec()).unwrap(), "Message 1");
 
-        let enc2 = double_ratchet_encrypt(
-            &mut bob_state,
-            &Uint8Array::from("Message 2".as_bytes()),
-        )
-        .unwrap();
+        let enc2 =
+            double_ratchet_encrypt(&mut bob_state, &Uint8Array::from("Message 2".as_bytes()))
+                .unwrap();
         let dec2 = double_ratchet_decrypt(&mut alice_state, &enc2).unwrap();
         assert_eq!(String::from_utf8(dec2.to_vec()).unwrap(), "Message 2");
 
         // Roots have diverged at this point - confirm the protocol still works.
-        let enc3 = double_ratchet_encrypt(
-            &mut alice_state,
-            &Uint8Array::from("Message 3".as_bytes()),
-        )
-        .unwrap();
+        let enc3 =
+            double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 3".as_bytes()))
+                .unwrap();
         let dec3 = double_ratchet_decrypt(&mut bob_state, &enc3).unwrap();
         assert_eq!(String::from_utf8(dec3.to_vec()).unwrap(), "Message 3");
     }

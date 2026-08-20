@@ -276,7 +276,9 @@ mod tests {
                 break;
             }
         }
-        assert!(found, "expected at least one invalid Ed25519 public key encoding");
+        assert!(
+            found,
+            "expected at least one invalid Ed25519 public key encoding"
+        );
     }
 }
-

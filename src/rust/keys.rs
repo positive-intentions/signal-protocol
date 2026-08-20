@@ -2,10 +2,10 @@
 //!
 //! Thin WASM wrapper around signal-protocol-core key generation.
 
+use crate::rust::types::KeyPair;
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
-use crate::rust::types::KeyPair;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn log(s: &str) {
@@ -162,7 +162,7 @@ mod tests {
         use crate::rust::crypto::x25519_ecdh;
         let shared_secret = x25519_ecdh(
             &keypair.private_key().to_vec(),
-            &keypair2.public_key().to_vec()
+            &keypair2.public_key().to_vec(),
         );
 
         // Should succeed and produce a 32-byte shared secret
@@ -176,10 +176,16 @@ mod tests {
     fn test_keypair_uniqueness() {
         let keypair1 = generate_identity_keypair().unwrap();
         let keypair2 = generate_identity_keypair().unwrap();
-        
+
         // Keys should be different each time
-        assert_ne!(keypair1.public_key().to_vec(), keypair2.public_key().to_vec());
-        assert_ne!(keypair1.private_key().to_vec(), keypair2.private_key().to_vec());
+        assert_ne!(
+            keypair1.public_key().to_vec(),
+            keypair2.public_key().to_vec()
+        );
+        assert_ne!(
+            keypair1.private_key().to_vec(),
+            keypair2.private_key().to_vec()
+        );
     }
 
     /// Test all key generation functions for basic functionality
@@ -191,16 +197,25 @@ mod tests {
         let signed_prekey = generate_signed_prekey().unwrap();
         let one_time_prekey = generate_one_time_prekey().unwrap();
         let ephemeral = generate_ephemeral_keypair().unwrap();
-        
+
         // All should produce valid keypairs
         assert_eq!(identity.public_key().length(), 32);
         assert_eq!(signed_prekey.public_key().length(), 32);
         assert_eq!(one_time_prekey.public_key().length(), 32);
         assert_eq!(ephemeral.public_key().length(), 32);
-        
+
         // All should be unique
-        assert_ne!(identity.public_key().to_vec(), signed_prekey.public_key().to_vec());
-        assert_ne!(signed_prekey.public_key().to_vec(), one_time_prekey.public_key().to_vec());
-        assert_ne!(one_time_prekey.public_key().to_vec(), ephemeral.public_key().to_vec());
+        assert_ne!(
+            identity.public_key().to_vec(),
+            signed_prekey.public_key().to_vec()
+        );
+        assert_ne!(
+            signed_prekey.public_key().to_vec(),
+            one_time_prekey.public_key().to_vec()
+        );
+        assert_ne!(
+            one_time_prekey.public_key().to_vec(),
+            ephemeral.public_key().to_vec()
+        );
     }
 }

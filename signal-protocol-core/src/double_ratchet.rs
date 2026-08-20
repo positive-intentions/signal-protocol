@@ -88,26 +88,26 @@ pub fn perform_dh_ratchet_step(
 ) -> Result<(), SignalError> {
     let original_root_key = state.root_key.clone();
 
-    let (new_root_key_for_receiving, receiving_chain_key) =
-        if let Some(ref current_dh_keypair) = state.sending_dh_keypair {
-            let dh_output = simple_ecdh(&current_dh_keypair.private_key, new_remote_public_key)?;
+    let (new_root_key_for_receiving, receiving_chain_key) = if let Some(ref current_dh_keypair) =
+        state.sending_dh_keypair
+    {
+        let dh_output = simple_ecdh(&current_dh_keypair.private_key, new_remote_public_key)?;
 
-            let combined =
-                hkdf_derive_short(b"Signal_DH_Ratchet", &original_root_key, &dh_output, 64);
+        let combined = hkdf_derive_short(b"Signal_DH_Ratchet", &original_root_key, &dh_output, 64);
 
-            let new_root_key = combined[0..32].to_vec();
-            let recv_chain_key = combined[32..64].to_vec();
-            (new_root_key, recv_chain_key)
-        } else {
-            let recv_chain_key = hkdf_derive_short(
-                b"Signal_Initial_Chain",
-                &state.root_key,
-                HKDF_INFO_CHAIN_KEY,
-                32,
-            );
-            let root_for_receiving = state.root_key.clone();
-            (root_for_receiving, recv_chain_key)
-        };
+        let new_root_key = combined[0..32].to_vec();
+        let recv_chain_key = combined[32..64].to_vec();
+        (new_root_key, recv_chain_key)
+    } else {
+        let recv_chain_key = hkdf_derive_short(
+            b"Signal_Initial_Chain",
+            &state.root_key,
+            HKDF_INFO_CHAIN_KEY,
+            32,
+        );
+        let root_for_receiving = state.root_key.clone();
+        (root_for_receiving, recv_chain_key)
+    };
 
     state.root_key = new_root_key_for_receiving;
     state.receiving_chain_key = Some(receiving_chain_key);
@@ -487,7 +487,10 @@ mod tests {
         let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
 
         let m1 = double_ratchet_encrypt_internal(&mut alice, b"ping").unwrap();
-        assert_eq!(double_ratchet_decrypt_internal(&mut bob, &m1).unwrap(), b"ping");
+        assert_eq!(
+            double_ratchet_decrypt_internal(&mut bob, &m1).unwrap(),
+            b"ping"
+        );
 
         let m2 = double_ratchet_encrypt_internal(&mut bob, b"pong").unwrap();
         assert_eq!(
@@ -511,9 +514,18 @@ mod tests {
         let m1 = double_ratchet_encrypt_internal(&mut alice, b"msg1").unwrap();
         let m2 = double_ratchet_encrypt_internal(&mut alice, b"msg2").unwrap();
 
-        assert_eq!(double_ratchet_decrypt_internal(&mut bob, &m2).unwrap(), b"msg2");
-        assert_eq!(double_ratchet_decrypt_internal(&mut bob, &m0).unwrap(), b"msg0");
-        assert_eq!(double_ratchet_decrypt_internal(&mut bob, &m1).unwrap(), b"msg1");
+        assert_eq!(
+            double_ratchet_decrypt_internal(&mut bob, &m2).unwrap(),
+            b"msg2"
+        );
+        assert_eq!(
+            double_ratchet_decrypt_internal(&mut bob, &m0).unwrap(),
+            b"msg0"
+        );
+        assert_eq!(
+            double_ratchet_decrypt_internal(&mut bob, &m1).unwrap(),
+            b"msg1"
+        );
     }
 
     #[test]
@@ -545,7 +557,10 @@ mod tests {
         bob.receiving_dh_public_key = None;
         bob.receiving_message_number = 0;
         skip_message_keys(&mut bob, 2).unwrap();
-        assert!(bob.skipped_message_keys.keys().any(|k| k.starts_with("none:")));
+        assert!(bob
+            .skipped_message_keys
+            .keys()
+            .any(|k| k.starts_with("none:")));
     }
 
     #[test]
@@ -599,7 +614,10 @@ mod tests {
         double_ratchet_decrypt_internal(&mut bob, &msg).unwrap();
         // Replay with same number but chain already advanced → mismatch (no skipped key)
         let err = double_ratchet_decrypt_internal(&mut bob, &msg).unwrap_err();
-        assert!(matches!(err, SignalError::InvalidInput(_) | SignalError::Decryption(_)));
+        assert!(matches!(
+            err,
+            SignalError::InvalidInput(_) | SignalError::Decryption(_)
+        ));
     }
 
     #[test]

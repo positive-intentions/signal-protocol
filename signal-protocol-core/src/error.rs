@@ -46,7 +46,10 @@ mod tests {
                 SignalError::SignatureVerification("s".into()),
                 "Signature verification failed: s",
             ),
-            (SignalError::KeyExchange("x".into()), "Key exchange failed: x"),
+            (
+                SignalError::KeyExchange("x".into()),
+                "Key exchange failed: x",
+            ),
             (SignalError::Encryption("e".into()), "Encryption failed: e"),
             (SignalError::Decryption("d".into()), "Decryption failed: d"),
             (

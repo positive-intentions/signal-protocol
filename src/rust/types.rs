@@ -4,16 +4,16 @@
 //! implementation. All types are designed to work seamlessly with WebAssembly
 //! and provide efficient JavaScript interoperability.
 
-use wasm_bindgen::prelude::*;
 use js_sys::Uint8Array;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
 /// Cryptographic key pair structure
-/// 
+///
 /// Represents a public/private key pair used in the Signal Protocol.
 /// The keys are stored as byte vectors internally but exposed to JavaScript
 /// as Uint8Array objects for compatibility.
-/// 
+///
 /// ## Security Note
 /// Private keys should be handled with extreme care and never exposed
 /// in logs or transmitted over insecure channels.
@@ -23,7 +23,7 @@ pub struct KeyPair {
     /// Public key bytes - safe to share with other parties
     #[wasm_bindgen(skip)]
     pub public_key: Vec<u8>,
-    
+
     /// Private key bytes - must be kept secret and secure
     #[wasm_bindgen(skip)]
     pub private_key: Vec<u8>,
@@ -33,7 +33,7 @@ pub struct KeyPair {
 #[wasm_bindgen]
 impl KeyPair {
     /// Get the public key as a JavaScript Uint8Array
-    /// 
+    ///
     /// The public key can be safely shared with other parties for
     /// encryption, signature verification, or key agreement protocols.
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -43,7 +43,7 @@ impl KeyPair {
     }
 
     /// Get the private key as a JavaScript Uint8Array
-    /// 
+    ///
     /// ⚠️ **WARNING**: Private keys must be handled securely.
     /// Only access this when absolutely necessary for cryptographic operations.
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -54,11 +54,11 @@ impl KeyPair {
 }
 
 /// Result of X3DH key exchange protocol
-/// 
+///
 /// Contains the shared secret and associated data produced by the X3DH
 /// key agreement protocol. This data is used to initialize secure
 /// communication channels between two parties.
-/// 
+///
 /// ## X3DH Protocol
 /// The Extended Triple Diffie-Hellman (X3DH) is Signal's key agreement
 /// protocol that provides mutual authentication and forward secrecy.
@@ -69,7 +69,7 @@ pub struct X3DHResult {
     /// This secret is used to derive message encryption keys
     #[wasm_bindgen(skip)]
     pub shared_secret: Vec<u8>,
-    
+
     /// Associated data for additional context/authentication
     /// Can be used for protocol versioning or additional metadata
     #[wasm_bindgen(skip)]
@@ -80,7 +80,7 @@ pub struct X3DHResult {
 #[wasm_bindgen]
 impl X3DHResult {
     /// Get the shared secret as a JavaScript Uint8Array
-    /// 
+    ///
     /// This secret should be used immediately for key derivation and
     /// then securely wiped from memory when no longer needed.
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -90,7 +90,7 @@ impl X3DHResult {
     }
 
     /// Get the associated data as a JavaScript Uint8Array
-    /// 
+    ///
     /// Associated data provides additional context for the key exchange
     /// and can be used for protocol versioning or authentication.
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -101,11 +101,11 @@ impl X3DHResult {
 }
 
 /// Result of message encryption operation
-/// 
+///
 /// Contains both the encrypted ciphertext and the derived message key.
 /// The message key can be stored for future decryption operations,
 /// enabling asynchronous message processing.
-/// 
+///
 /// ## Forward Secrecy
 /// Each message uses a unique derived key, ensuring that compromise
 /// of one message key doesn't affect the security of other messages.
@@ -116,7 +116,7 @@ pub struct EncryptionResult {
     /// Includes the AES-GCM nonce prepended to the ciphertext
     #[wasm_bindgen(skip)]
     pub ciphertext: Vec<u8>,
-    
+
     /// The derived message key used for this specific message
     /// Can be stored separately for later decryption
     #[wasm_bindgen(skip)]
@@ -127,7 +127,7 @@ pub struct EncryptionResult {
 #[wasm_bindgen]
 impl EncryptionResult {
     /// Get the ciphertext as a JavaScript Uint8Array
-    /// 
+    ///
     /// The ciphertext includes the nonce and authentication tag,
     /// making it self-contained for transmission and storage.
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -137,7 +137,7 @@ impl EncryptionResult {
     }
 
     /// Get the message key as a JavaScript Uint8Array
-    /// 
+    ///
     /// This key is required for decryption and should be stored
     /// securely alongside the ciphertext if needed for later access.
     #[cfg_attr(coverage_nightly, coverage(off))]
