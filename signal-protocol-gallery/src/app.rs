@@ -80,6 +80,7 @@ pub fn App() -> Element {
             |target: &NavTarget| match target {
                 NavTarget::Chats => "/".into(),
                 NavTarget::Chat(_) => "/".into(),
+                NavTarget::Contacts => "/".into(),
                 NavTarget::Calls => "/".into(),
                 NavTarget::Profile => "/".into(),
                 NavTarget::ActiveCall { .. } => "/".into(),
