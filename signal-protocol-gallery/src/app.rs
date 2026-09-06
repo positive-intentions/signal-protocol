@@ -81,6 +81,7 @@ pub fn App() -> Element {
                 NavTarget::Chats => "/".into(),
                 NavTarget::Chat(_) => "/".into(),
                 NavTarget::Contacts => "/".into(),
+                NavTarget::Contact(_) => "/".into(),
                 NavTarget::Calls => "/".into(),
                 NavTarget::Profile => "/".into(),
                 NavTarget::ActiveCall { .. } => "/".into(),
