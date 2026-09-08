@@ -24,6 +24,7 @@ fn hkdf_derive_short(
 }
 
 #[derive(Clone, Debug)]
+#[cfg_attr(not(hax_compilation), derive(serde::Serialize, serde::Deserialize))]
 pub struct DoubleRatchetState {
     pub root_key: Vec<u8>,
     pub sending_chain_key: Option<Vec<u8>>,
@@ -54,6 +55,7 @@ impl DoubleRatchetState {
 }
 
 #[derive(Clone, Debug)]
+#[cfg_attr(not(hax_compilation), derive(serde::Serialize, serde::Deserialize))]
 pub struct DoubleRatchetMessage {
     pub ciphertext: Vec<u8>,
     pub dh_public_key: Vec<u8>,
