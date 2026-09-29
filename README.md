@@ -358,8 +358,15 @@ See `signal-protocol-core/proofs/README.md` for detailed setup of F\*, Rocq, and
 
 ## License
 
-ISC
-```
+Copyright (c) 2026 Positive Intentions
+
+SPDX-License-Identifier: AGPL-3.0-only
+
+This project is licensed under the GNU Affero General Public License v3.0 only. You may use, modify, and distribute it, including for money, if the whole product stays under AGPL-3.0 and users who interact with it over a network can obtain the corresponding source. See [LICENSE](LICENSE) for the full terms.
+
+A commercial license for closed-source or proprietary use is available from Positive Intentions on request. That offer is not a contract, does not change the public AGPL-3.0-only grant, and is not part of the SPDX expression.
+
+Third-party dependencies keep their own licenses. This notice is not legal advice.
 
 ## Star History
 

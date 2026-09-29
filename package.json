@@ -115,7 +115,7 @@
     "docker:ps": "sudo docker compose ps"
   },
   "author": "",
-  "license": "ISC",
+  "license": "AGPL-3.0-only",
   "devDependencies": {
     "@babel/core": "^7.23.9",
     "@babel/preset-env": "^7.23.9",

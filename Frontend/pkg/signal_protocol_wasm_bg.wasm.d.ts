@@ -1,24 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
-export const __wbg_encryptionresult_free: (a: number, b: number) => void;
-export const encryptionresult_ciphertext: (a: number) => any;
-export const encryptionresult_message_key: (a: number) => any;
-export const generate_identity_keypair: () => [number, number, number];
-export const generate_signed_prekey: () => [number, number, number];
-export const generate_one_time_prekey: () => [number, number, number];
-export const generate_ephemeral_keypair: () => [number, number, number];
 export const sign_data: (a: any, b: any) => [number, number, number];
 export const verify_signature: (a: any, b: any, c: any) => [number, number, number];
-export const x3dh_initiate: (a: any, b: any, c: any, d: any, e: number) => [number, number, number];
-export const x3dh_respond: (a: any, b: any, c: number, d: any, e: any) => [number, number, number];
-export const encrypt_message: (a: any, b: any, c: number) => [number, number, number];
-export const decrypt_message: (a: any, b: any, c: any, d: number) => [number, number, number];
-export const serialize_public_key: (a: any) => [number, number, number];
-export const deserialize_public_key: (a: any) => [number, number, number];
-export const hkdf_derive_key: (a: any, b: any, c: any, d: number) => [number, number, number];
-export const free_keypair: (a: number) => void;
-export const free_buffer: (a: any) => void;
 export const __wbg_doubleratchetstate_free: (a: number, b: number) => void;
 export const doubleratchetstate_new: () => number;
 export const doubleratchetstate_root_key: (a: number) => any;
@@ -34,6 +18,22 @@ export const initialize_double_ratchet: (a: any, b: number) => [number, number, 
 export const double_ratchet_encrypt: (a: number, b: any) => [number, number, number];
 export const double_ratchet_decrypt: (a: number, b: number) => [number, number, number];
 export const cleanup_skipped_message_keys: (a: number, b: number) => number;
+export const generate_identity_keypair: () => [number, number, number];
+export const generate_signed_prekey: () => [number, number, number];
+export const generate_one_time_prekey: () => [number, number, number];
+export const generate_ephemeral_keypair: () => [number, number, number];
+export const encrypt_message: (a: any, b: any, c: number) => [number, number, number];
+export const decrypt_message: (a: any, b: any, c: any, d: number) => [number, number, number];
+export const __wbg_encryptionresult_free: (a: number, b: number) => void;
+export const encryptionresult_ciphertext: (a: number) => any;
+export const encryptionresult_message_key: (a: number) => any;
+export const serialize_public_key: (a: any) => [number, number, number];
+export const deserialize_public_key: (a: any) => [number, number, number];
+export const hkdf_derive_key: (a: any, b: any, c: any, d: number) => [number, number, number];
+export const free_keypair: (a: number) => void;
+export const free_buffer: (a: any) => void;
+export const x3dh_initiate: (a: any, b: any, c: any, d: any, e: number) => [number, number, number];
+export const x3dh_respond: (a: any, b: any, c: number, d: any, e: any) => [number, number, number];
 export const main: () => void;
 export const __wbg_x3dhresult_free: (a: number, b: number) => void;
 export const __wbg_keypair_free: (a: number, b: number) => void;

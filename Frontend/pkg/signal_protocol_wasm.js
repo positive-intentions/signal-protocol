@@ -108,6 +108,152 @@ function takeFromExternrefTable0(idx) {
     return value;
 }
 /**
+ * Sign data using Ed25519 digital signature algorithm
+ *
+ * Creates a cryptographically secure digital signature that proves the data
+ * was signed by the holder of the corresponding Ed25519 private key.
+ * The signature can be verified by anyone who has the public key.
+ *
+ * ## Implementation
+ * Uses Ed25519 (Edwards-curve Digital Signature Algorithm) which provides:
+ * - 128-bit security level
+ * - Deterministic signatures (same input = same signature)
+ * - Small signature size (64 bytes)
+ * - Fast verification
+ *
+ * ## Usage Example
+ * ```javascript
+ * const signature = sign_data(privateKey, message);
+ * const isValid = verify_signature(publicKey, signature, message);
+ * ```
+ *
+ * ## Parameters
+ * - `private_key`: The signer's Ed25519 private key as Uint8Array (must be 32 bytes)
+ * - `data`: The data to sign as Uint8Array
+ *
+ * ## Returns
+ * A Uint8Array containing the 64-byte Ed25519 signature
+ *
+ * ## Errors
+ * - Returns error if private key is not exactly 32 bytes
+ * - Returns error if signing operation fails
+ * @param {Uint8Array} private_key
+ * @param {Uint8Array} data
+ * @returns {Uint8Array}
+ */
+export function sign_data(private_key, data) {
+    const ret = wasm.sign_data(private_key, data);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * Verify an Ed25519 digital signature
+ *
+ * Verifies that a signature was created by the holder of the private key
+ * corresponding to the given Ed25519 public key. This ensures message
+ * authenticity and integrity through elliptic curve cryptography.
+ *
+ * ## Security Properties
+ * - **Unforgeability**: Cannot create valid signatures without private key
+ * - **Non-repudiation**: Signer cannot deny creating the signature
+ * - **Integrity**: Any modification to data invalidates the signature
+ * - **Constant-time**: Verification takes same time regardless of validity
+ *
+ * ## Usage Example
+ * ```javascript
+ * const isValid = verify_signature(publicKey, signature, originalMessage);
+ * if (isValid) {
+ *     console.log("Signature is valid!");
+ * }
+ * ```
+ *
+ * ## Parameters
+ * - `public_key`: The signer's Ed25519 public key as Uint8Array (must be 32 bytes)
+ * - `signature`: The Ed25519 signature to verify as Uint8Array (must be 64 bytes)
+ * - `data`: The original signed data as Uint8Array
+ *
+ * ## Returns
+ * `true` if the signature is valid, `false` otherwise
+ *
+ * ## Errors
+ * - Returns error if public key is not exactly 32 bytes
+ * - Returns error if signature is not exactly 64 bytes
+ * - Returns error if key format is invalid
+ * @param {Uint8Array} public_key
+ * @param {Uint8Array} signature
+ * @param {Uint8Array} data
+ * @returns {boolean}
+ */
+export function verify_signature(public_key, signature, data) {
+    const ret = wasm.verify_signature(public_key, signature, data);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return ret[0] !== 0;
+}
+
+/**
+ * @param {Uint8Array} shared_secret
+ * @param {boolean} is_initiator
+ * @returns {DoubleRatchetState}
+ */
+export function initialize_double_ratchet(shared_secret, is_initiator) {
+    const ret = wasm.initialize_double_ratchet(shared_secret, is_initiator);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return DoubleRatchetState.__wrap(ret[0]);
+}
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
+}
+/**
+ * @param {DoubleRatchetState} state
+ * @param {Uint8Array} plaintext
+ * @returns {DoubleRatchetMessage}
+ */
+export function double_ratchet_encrypt(state, plaintext) {
+    _assertClass(state, DoubleRatchetState);
+    const ret = wasm.double_ratchet_encrypt(state.__wbg_ptr, plaintext);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return DoubleRatchetMessage.__wrap(ret[0]);
+}
+
+/**
+ * @param {DoubleRatchetState} state
+ * @param {DoubleRatchetMessage} message
+ * @returns {Uint8Array}
+ */
+export function double_ratchet_decrypt(state, message) {
+    _assertClass(state, DoubleRatchetState);
+    _assertClass(message, DoubleRatchetMessage);
+    const ret = wasm.double_ratchet_decrypt(state.__wbg_ptr, message.__wbg_ptr);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * @param {DoubleRatchetState} state
+ * @param {number} max_keys
+ * @returns {number}
+ */
+export function cleanup_skipped_message_keys(state, max_keys) {
+    _assertClass(state, DoubleRatchetState);
+    const ret = wasm.cleanup_skipped_message_keys(state.__wbg_ptr, max_keys);
+    return ret >>> 0;
+}
+
+/**
  * Generate an identity key pair for long-term user identification
  *
  * Identity keys are long-lived keys that identify a user or device.
@@ -231,207 +377,6 @@ export function generate_ephemeral_keypair() {
         throw takeFromExternrefTable0(ret[1]);
     }
     return KeyPair.__wrap(ret[0]);
-}
-
-/**
- * Sign data using Ed25519 digital signature algorithm
- *
- * Creates a cryptographically secure digital signature that proves the data
- * was signed by the holder of the corresponding Ed25519 private key.
- * The signature can be verified by anyone who has the public key.
- *
- * ## Implementation
- * Uses Ed25519 (Edwards-curve Digital Signature Algorithm) which provides:
- * - 128-bit security level
- * - Deterministic signatures (same input = same signature)
- * - Small signature size (64 bytes)
- * - Fast verification
- *
- * ## Usage Example
- * ```javascript
- * const signature = sign_data(privateKey, message);
- * const isValid = verify_signature(publicKey, signature, message);
- * ```
- *
- * ## Parameters
- * - `private_key`: The signer's Ed25519 private key as Uint8Array (must be 32 bytes)
- * - `data`: The data to sign as Uint8Array
- *
- * ## Returns
- * A Uint8Array containing the 64-byte Ed25519 signature
- *
- * ## Errors
- * - Returns error if private key is not exactly 32 bytes
- * - Returns error if signing operation fails
- * @param {Uint8Array} private_key
- * @param {Uint8Array} data
- * @returns {Uint8Array}
- */
-export function sign_data(private_key, data) {
-    const ret = wasm.sign_data(private_key, data);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return takeFromExternrefTable0(ret[0]);
-}
-
-/**
- * Verify an Ed25519 digital signature
- *
- * Verifies that a signature was created by the holder of the private key
- * corresponding to the given Ed25519 public key. This ensures message
- * authenticity and integrity through elliptic curve cryptography.
- *
- * ## Security Properties
- * - **Unforgeability**: Cannot create valid signatures without private key
- * - **Non-repudiation**: Signer cannot deny creating the signature
- * - **Integrity**: Any modification to data invalidates the signature
- * - **Constant-time**: Verification takes same time regardless of validity
- *
- * ## Usage Example
- * ```javascript
- * const isValid = verify_signature(publicKey, signature, originalMessage);
- * if (isValid) {
- *     console.log("Signature is valid!");
- * }
- * ```
- *
- * ## Parameters
- * - `public_key`: The signer's Ed25519 public key as Uint8Array (must be 32 bytes)
- * - `signature`: The Ed25519 signature to verify as Uint8Array (must be 64 bytes)
- * - `data`: The original signed data as Uint8Array
- *
- * ## Returns
- * `true` if the signature is valid, `false` otherwise
- *
- * ## Errors
- * - Returns error if public key is not exactly 32 bytes
- * - Returns error if signature is not exactly 64 bytes
- * - Returns error if key format is invalid
- * @param {Uint8Array} public_key
- * @param {Uint8Array} signature
- * @param {Uint8Array} data
- * @returns {boolean}
- */
-export function verify_signature(public_key, signature, data) {
-    const ret = wasm.verify_signature(public_key, signature, data);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return ret[0] !== 0;
-}
-
-/**
- * Initiate X3DH key exchange (Alice's side)
- *
- * This function performs the X3DH key agreement from the initiator's perspective.
- * Alice combines her keys with Bob's prekeys to compute a shared secret that
- * both parties can independently derive.
- *
- * ## X3DH Protocol Overview
- * The X3DH protocol performs multiple Diffie-Hellman computations:
- * 1. DH1: Alice_Identity_Private × Bob_SignedPrekey_Public
- * 2. DH2: Alice_Ephemeral_Private × Bob_Identity_Public
- * 3. DH3: Alice_Ephemeral_Private × Bob_SignedPrekey_Public
- * 4. DH4: Alice_Ephemeral_Private × Bob_OneTimePrekey_Public (optional)
- *
- * The results are concatenated and fed into HKDF to derive the final shared secret.
- *
- * ## Security Properties
- * - **Forward Secrecy**: Compromise of long-term keys doesn't affect past sessions
- * - **Authentication**: Both parties prove their identity through key ownership
- * - **Asynchronous**: Bob doesn't need to be online during key exchange
- * - **Deniability**: No long-term proof of participation in conversations
- *
- * ## Parameters
- * - `alice_identity_private`: Alice's long-term identity private key (32 bytes)
- * - `alice_ephemeral_private`: Alice's session-specific ephemeral private key (32 bytes)
- * - `bob_identity_public`: Bob's identity public key (32 bytes)
- * - `bob_signed_prekey_public`: Bob's signed prekey public key (32 bytes)
- * - `bob_one_time_prekey_public`: Optional one-time prekey for additional forward secrecy
- *
- * ## Returns
- * An `X3DHResult` containing the shared secret and associated data
- *
- * ## Example Usage
- * ```rust
- * let result = x3dh_initiate(
- *     &alice_identity_private,
- *     &alice_ephemeral_private,
- *     &bob_identity_public,
- *     &bob_signed_prekey_public,
- *     Some(bob_one_time_prekey_public)
- * )?;
- * let shared_secret = result.shared_secret();
- * ```
- * @param {Uint8Array} alice_identity_private
- * @param {Uint8Array} alice_ephemeral_private
- * @param {Uint8Array} bob_identity_public
- * @param {Uint8Array} bob_signed_prekey_public
- * @param {Uint8Array | null} [bob_one_time_prekey_public]
- * @returns {X3DHResult}
- */
-export function x3dh_initiate(alice_identity_private, alice_ephemeral_private, bob_identity_public, bob_signed_prekey_public, bob_one_time_prekey_public) {
-    const ret = wasm.x3dh_initiate(alice_identity_private, alice_ephemeral_private, bob_identity_public, bob_signed_prekey_public, isLikeNone(bob_one_time_prekey_public) ? 0 : addToExternrefTable0(bob_one_time_prekey_public));
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return X3DHResult.__wrap(ret[0]);
-}
-
-/**
- * Respond to X3DH key exchange (Bob's side)
- *
- * This function performs the X3DH key agreement from the responder's perspective.
- * Bob uses his prekeys and Alice's ephemeral key to compute the same shared secret
- * that Alice derived on her side.
- *
- * ## Protocol Symmetry
- * Bob performs the exact same DH computations as Alice, but uses his private keys
- * instead of Alice's. The commutativity property of our simplified ECDH ensures
- * that both parties compute identical shared secrets.
- *
- * ## Key Derivation Order
- * Bob must perform the DH computations in the same order as Alice:
- * 1. DH1: Bob_SignedPrekey_Private × Alice_Identity_Public (= Alice's DH1)
- * 2. DH2: Bob_Identity_Private × Alice_Ephemeral_Public (= Alice's DH2)
- * 3. DH3: Bob_SignedPrekey_Private × Alice_Ephemeral_Public (= Alice's DH3)
- * 4. DH4: Bob_OneTimePrekey_Private × Alice_Ephemeral_Public (= Alice's DH4, optional)
- *
- * ## Parameters
- * - `bob_identity_private`: Bob's long-term identity private key (32 bytes)
- * - `bob_signed_prekey_private`: Bob's signed prekey private key (32 bytes)
- * - `bob_one_time_prekey_private`: Optional one-time prekey private key (32 bytes)
- * - `alice_identity_public`: Alice's identity public key (32 bytes)
- * - `alice_ephemeral_public`: Alice's ephemeral public key from the key exchange (32 bytes)
- *
- * ## Returns
- * An `X3DHResult` containing the same shared secret Alice computed
- *
- * ## Example Usage
- * ```rust
- * let result = x3dh_respond(
- *     &bob_identity_private,
- *     &bob_signed_prekey_private,
- *     Some(bob_one_time_prekey_private),
- *     &alice_identity_public,
- *     &alice_ephemeral_public
- * )?;
- * let shared_secret = result.shared_secret();
- * ```
- * @param {Uint8Array} bob_identity_private
- * @param {Uint8Array} bob_signed_prekey_private
- * @param {Uint8Array | null | undefined} bob_one_time_prekey_private
- * @param {Uint8Array} alice_identity_public
- * @param {Uint8Array} alice_ephemeral_public
- * @returns {X3DHResult}
- */
-export function x3dh_respond(bob_identity_private, bob_signed_prekey_private, bob_one_time_prekey_private, alice_identity_public, alice_ephemeral_public) {
-    const ret = wasm.x3dh_respond(bob_identity_private, bob_signed_prekey_private, isLikeNone(bob_one_time_prekey_private) ? 0 : addToExternrefTable0(bob_one_time_prekey_private), alice_identity_public, alice_ephemeral_public);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return X3DHResult.__wrap(ret[0]);
 }
 
 /**
@@ -697,11 +642,6 @@ export function hkdf_derive_key(input_key_material, salt, info, output_length) {
     return takeFromExternrefTable0(ret[0]);
 }
 
-function _assertClass(instance, klass) {
-    if (!(instance instanceof klass)) {
-        throw new Error(`expected instance of ${klass.name}`);
-    }
-}
 /**
  * Free memory associated with a KeyPair (placeholder for manual memory management)
  *
@@ -762,56 +702,116 @@ export function free_buffer(_buffer) {
 }
 
 /**
- * @param {Uint8Array} shared_secret
- * @param {boolean} is_initiator
- * @returns {DoubleRatchetState}
+ * Initiate X3DH key exchange (Alice's side)
+ *
+ * This function performs the X3DH key agreement from the initiator's perspective.
+ * Alice combines her keys with Bob's prekeys to compute a shared secret that
+ * both parties can independently derive.
+ *
+ * ## X3DH Protocol Overview
+ * The X3DH protocol performs multiple Diffie-Hellman computations:
+ * 1. DH1: Alice_Identity_Private × Bob_SignedPrekey_Public
+ * 2. DH2: Alice_Ephemeral_Private × Bob_Identity_Public
+ * 3. DH3: Alice_Ephemeral_Private × Bob_SignedPrekey_Public
+ * 4. DH4: Alice_Ephemeral_Private × Bob_OneTimePrekey_Public (optional)
+ *
+ * The results are concatenated and fed into HKDF to derive the final shared secret.
+ *
+ * ## Security Properties
+ * - **Forward Secrecy**: Compromise of long-term keys doesn't affect past sessions
+ * - **Authentication**: Both parties prove their identity through key ownership
+ * - **Asynchronous**: Bob doesn't need to be online during key exchange
+ * - **Deniability**: No long-term proof of participation in conversations
+ *
+ * ## Parameters
+ * - `alice_identity_private`: Alice's long-term identity private key (32 bytes)
+ * - `alice_ephemeral_private`: Alice's session-specific ephemeral private key (32 bytes)
+ * - `bob_identity_public`: Bob's identity public key (32 bytes)
+ * - `bob_signed_prekey_public`: Bob's signed prekey public key (32 bytes)
+ * - `bob_one_time_prekey_public`: Optional one-time prekey for additional forward secrecy
+ *
+ * ## Returns
+ * An `X3DHResult` containing the shared secret and associated data
+ *
+ * ## Example Usage
+ * ```rust
+ * let result = x3dh_initiate(
+ *     &alice_identity_private,
+ *     &alice_ephemeral_private,
+ *     &bob_identity_public,
+ *     &bob_signed_prekey_public,
+ *     Some(bob_one_time_prekey_public)
+ * )?;
+ * let shared_secret = result.shared_secret();
+ * ```
+ * @param {Uint8Array} alice_identity_private
+ * @param {Uint8Array} alice_ephemeral_private
+ * @param {Uint8Array} bob_identity_public
+ * @param {Uint8Array} bob_signed_prekey_public
+ * @param {Uint8Array | null} [bob_one_time_prekey_public]
+ * @returns {X3DHResult}
  */
-export function initialize_double_ratchet(shared_secret, is_initiator) {
-    const ret = wasm.initialize_double_ratchet(shared_secret, is_initiator);
+export function x3dh_initiate(alice_identity_private, alice_ephemeral_private, bob_identity_public, bob_signed_prekey_public, bob_one_time_prekey_public) {
+    const ret = wasm.x3dh_initiate(alice_identity_private, alice_ephemeral_private, bob_identity_public, bob_signed_prekey_public, isLikeNone(bob_one_time_prekey_public) ? 0 : addToExternrefTable0(bob_one_time_prekey_public));
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
-    return DoubleRatchetState.__wrap(ret[0]);
+    return X3DHResult.__wrap(ret[0]);
 }
 
 /**
- * @param {DoubleRatchetState} state
- * @param {Uint8Array} plaintext
- * @returns {DoubleRatchetMessage}
+ * Respond to X3DH key exchange (Bob's side)
+ *
+ * This function performs the X3DH key agreement from the responder's perspective.
+ * Bob uses his prekeys and Alice's ephemeral key to compute the same shared secret
+ * that Alice derived on her side.
+ *
+ * ## Protocol Symmetry
+ * Bob performs the exact same DH computations as Alice, but uses his private keys
+ * instead of Alice's. The commutativity property of our simplified ECDH ensures
+ * that both parties compute identical shared secrets.
+ *
+ * ## Key Derivation Order
+ * Bob must perform the DH computations in the same order as Alice:
+ * 1. DH1: Bob_SignedPrekey_Private × Alice_Identity_Public (= Alice's DH1)
+ * 2. DH2: Bob_Identity_Private × Alice_Ephemeral_Public (= Alice's DH2)
+ * 3. DH3: Bob_SignedPrekey_Private × Alice_Ephemeral_Public (= Alice's DH3)
+ * 4. DH4: Bob_OneTimePrekey_Private × Alice_Ephemeral_Public (= Alice's DH4, optional)
+ *
+ * ## Parameters
+ * - `bob_identity_private`: Bob's long-term identity private key (32 bytes)
+ * - `bob_signed_prekey_private`: Bob's signed prekey private key (32 bytes)
+ * - `bob_one_time_prekey_private`: Optional one-time prekey private key (32 bytes)
+ * - `alice_identity_public`: Alice's identity public key (32 bytes)
+ * - `alice_ephemeral_public`: Alice's ephemeral public key from the key exchange (32 bytes)
+ *
+ * ## Returns
+ * An `X3DHResult` containing the same shared secret Alice computed
+ *
+ * ## Example Usage
+ * ```rust
+ * let result = x3dh_respond(
+ *     &bob_identity_private,
+ *     &bob_signed_prekey_private,
+ *     Some(bob_one_time_prekey_private),
+ *     &alice_identity_public,
+ *     &alice_ephemeral_public
+ * )?;
+ * let shared_secret = result.shared_secret();
+ * ```
+ * @param {Uint8Array} bob_identity_private
+ * @param {Uint8Array} bob_signed_prekey_private
+ * @param {Uint8Array | null | undefined} bob_one_time_prekey_private
+ * @param {Uint8Array} alice_identity_public
+ * @param {Uint8Array} alice_ephemeral_public
+ * @returns {X3DHResult}
  */
-export function double_ratchet_encrypt(state, plaintext) {
-    _assertClass(state, DoubleRatchetState);
-    const ret = wasm.double_ratchet_encrypt(state.__wbg_ptr, plaintext);
+export function x3dh_respond(bob_identity_private, bob_signed_prekey_private, bob_one_time_prekey_private, alice_identity_public, alice_ephemeral_public) {
+    const ret = wasm.x3dh_respond(bob_identity_private, bob_signed_prekey_private, isLikeNone(bob_one_time_prekey_private) ? 0 : addToExternrefTable0(bob_one_time_prekey_private), alice_identity_public, alice_ephemeral_public);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
-    return DoubleRatchetMessage.__wrap(ret[0]);
-}
-
-/**
- * @param {DoubleRatchetState} state
- * @param {DoubleRatchetMessage} message
- * @returns {Uint8Array}
- */
-export function double_ratchet_decrypt(state, message) {
-    _assertClass(state, DoubleRatchetState);
-    _assertClass(message, DoubleRatchetMessage);
-    const ret = wasm.double_ratchet_decrypt(state.__wbg_ptr, message.__wbg_ptr);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return takeFromExternrefTable0(ret[0]);
-}
-
-/**
- * @param {DoubleRatchetState} state
- * @param {number} max_keys
- * @returns {number}
- */
-export function cleanup_skipped_message_keys(state, max_keys) {
-    _assertClass(state, DoubleRatchetState);
-    const ret = wasm.cleanup_skipped_message_keys(state.__wbg_ptr, max_keys);
-    return ret >>> 0;
+    return X3DHResult.__wrap(ret[0]);
 }
 
 /**
