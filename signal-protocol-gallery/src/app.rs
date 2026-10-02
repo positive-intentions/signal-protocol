@@ -79,10 +79,10 @@ pub fn App() -> Element {
         Nav::new(
             |target: &NavTarget| match target {
                 NavTarget::Chats => "/".into(),
-                NavTarget::Chat(_) => "/".into(),
+                NavTarget::Chat(_) | NavTarget::ChatFiles(_) => "/".into(),
                 NavTarget::Contacts => "/".into(),
-                NavTarget::Contact(_) => "/".into(),
-                NavTarget::Calls => "/".into(),
+                NavTarget::Contact(_) | NavTarget::ContactFiles(_) => "/".into(),
+                NavTarget::Calls | NavTarget::Call(_) => "/".into(),
                 NavTarget::Profile => "/".into(),
                 NavTarget::ActiveCall { .. } => "/".into(),
             },
