@@ -141,10 +141,13 @@ npm run test:wasm:node
 
 ### View Coverage
 
-**Rust (llvm-cov):** local HTML via `npm run test:rust:coverage`, then open
-`signal-protocol-gallery/assets/coverage-html/html/index.html`. CI enforces 100% line
-coverage on the workspace ([Coverage](https://github.com/positive-intentions/signal-protocol/actions/workflows/coverage.yml)
-workflow / `npm run test:rust:coverage:ci`).
+**Rust (llvm-cov):** 100% line gate on `signal-protocol-core`. Workspace tests still run
+(including `src/rust/tests.rs`, which exercise core) but `src/` WASM sources are ignored
+so wrappers are not painted `coverage(off)`. `coverage(off)` is reserved for
+proven-unreachable helpers (for example HKDF expand of ≤64 bytes).
+WASM bindings are also exercised by Jest / wasm-pack.
+Local HTML: `npm run test:rust:coverage`, then open
+`signal-protocol-gallery/assets/coverage-html/html/index.html`.
 
 **Jest:** reports land in `coverage/` (`coverage/lcov-report/index.html`).
 

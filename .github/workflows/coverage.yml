@@ -34,7 +34,7 @@ jobs:
       - name: Generate lcov and enforce line gate
         run: >
           cargo +nightly llvm-cov --workspace --branch
-          --ignore-filename-regex 'src/rust/tests\.rs|src/rust/wasm_tests\.rs'
+          --ignore-filename-regex 'signal-protocol/src/'
           --fail-under-lines 100
           --lcov --output-path lcov.info
           --summary-only

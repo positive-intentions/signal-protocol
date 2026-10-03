@@ -17,7 +17,6 @@ use web_sys::console;
 ///
 /// Provides visibility into utility operations during development
 /// and helps trace data transformations and memory operations.
-#[cfg_attr(coverage_nightly, coverage(off))]
 pub(crate) fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -126,7 +125,6 @@ pub(crate) fn hkdf_derive_key_internal(
 /// const serialized = serialize_public_key(publicKey);
 /// // Send serialized key over network or store in database
 /// ```
-#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn serialize_public_key(public_key: &Uint8Array) -> Result<Uint8Array, JsValue> {
     log("Serializing public key for transmission");
@@ -179,7 +177,6 @@ pub fn serialize_public_key(public_key: &Uint8Array) -> Result<Uint8Array, JsVal
 /// const publicKey = deserialize_public_key(receivedData);
 /// // Use public key for cryptographic operations
 /// ```
-#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn deserialize_public_key(serialized_key: &Uint8Array) -> Result<Uint8Array, JsValue> {
     log("Deserializing public key from transmission format");
@@ -243,7 +240,6 @@ pub fn deserialize_public_key(serialized_key: &Uint8Array) -> Result<Uint8Array,
 ///     32
 /// );
 /// ```
-#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn hkdf_derive_key(
     input_key_material: &Uint8Array,
@@ -297,7 +293,6 @@ pub fn hkdf_derive_key(
 /// // Optional explicit cleanup (not required in Rust/WASM)
 /// free_keypair(keyPair);
 /// ```
-#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn free_keypair(_keypair: &KeyPair) {
     log("KeyPair memory cleanup requested (automatic in Rust)");
@@ -324,7 +319,6 @@ pub fn free_keypair(_keypair: &KeyPair) {
 /// // Optional explicit cleanup (not required in Rust/WASM)
 /// free_buffer(buffer);
 /// ```
-#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn free_buffer(_buffer: &Uint8Array) {
     log("Buffer memory cleanup requested (automatic in Rust/WASM)");
@@ -334,13 +328,11 @@ pub fn free_buffer(_buffer: &Uint8Array) {
 
 #[cfg(test)]
 #[allow(dead_code)]
-#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
 
     /// Test public key serialization and deserialization roundtrip
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_key_serialization_roundtrip() {
         let original_key = Uint8Array::from(&[1u8; 32][..]);
@@ -357,7 +349,6 @@ mod tests {
     }
 
     /// Test key serialization error handling
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_key_serialization_errors() {
         // Test with wrong key size
@@ -379,7 +370,6 @@ mod tests {
     }
 
     /// Test HKDF key derivation
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_hkdf_derivation() {
         let input_material = Uint8Array::from(&[1u8; 32][..]);
@@ -405,7 +395,6 @@ mod tests {
     }
 
     /// Test HKDF with empty salt
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_hkdf_empty_salt() {
         let input_material = Uint8Array::from(&[1u8; 32][..]);
@@ -417,7 +406,6 @@ mod tests {
     }
 
     /// Test HKDF error conditions
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_hkdf_errors() {
         let input_material = Uint8Array::from(&[1u8; 32][..]);
@@ -434,7 +422,6 @@ mod tests {
     }
 
     /// Test memory management functions (they should not panic)
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_memory_management_functions() {
         use crate::rust::keys::generate_identity_keypair;

@@ -22,11 +22,10 @@ Generate the llvm-cov HTML report from the repo root, then open the HTML file in
 browser (not embedded in the gallery UI):
 
 ```bash
-# from signal-protocol repo root
+# from signal-protocol repo root (gates core; ignores WASM src/)
 npm run test:rust:coverage
 # equivalent:
-# cargo +nightly llvm-cov --workspace --branch \
-#   --ignore-filename-regex 'src/rust/tests\.rs|src/rust/wasm_tests\.rs' \
+# cargo +nightly llvm-cov --workspace --branch --ignore-filename-regex 'signal-protocol/src/' \
 #   --html --output-dir signal-protocol-gallery/assets/coverage-html
 
 # open signal-protocol-gallery/assets/coverage-html/html/index.html

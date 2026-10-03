@@ -16,7 +16,6 @@ use web_sys::console;
 ///
 /// Helps trace the X3DH protocol execution and debug issues
 /// during key exchange operations.
-#[cfg_attr(coverage_nightly, coverage(off))]
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -116,7 +115,6 @@ pub(crate) fn x3dh_respond_internal(
 /// )?;
 /// let shared_secret = result.shared_secret();
 /// ```
-#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn x3dh_initiate(
     alice_identity_private: &Uint8Array,
@@ -191,7 +189,6 @@ pub fn x3dh_initiate(
 /// )?;
 /// let shared_secret = result.shared_secret();
 /// ```
-#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn x3dh_respond(
     bob_identity_private: &Uint8Array,
@@ -230,14 +227,12 @@ pub fn x3dh_respond(
 
 #[cfg(test)]
 #[allow(dead_code)]
-#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::rust::keys::*;
     use wasm_bindgen_test::*;
 
     /// Test complete X3DH key exchange without one-time prekey
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_x3dh_without_one_time_prekey() {
         // Generate keys for Alice
@@ -281,7 +276,6 @@ mod tests {
     }
 
     /// Test complete X3DH key exchange with one-time prekey
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_x3dh_with_one_time_prekey() {
         // Generate keys for Alice
@@ -326,7 +320,6 @@ mod tests {
     }
 
     /// Test that different key sets produce different shared secrets
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_x3dh_uniqueness() {
         // First key exchange

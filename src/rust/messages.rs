@@ -22,7 +22,6 @@ use web_sys::console;
 ///
 /// Provides visibility into message encryption/decryption operations
 /// during development and troubleshooting.
-#[cfg_attr(coverage_nightly, coverage(off))]
 fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -145,7 +144,6 @@ pub(crate) fn decrypt_message_internal(
 /// const encryptedData = result.ciphertext();
 /// const messageKey = result.message_key();
 /// ```
-#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn encrypt_message(
     shared_secret: &Uint8Array,
@@ -210,7 +208,6 @@ pub fn encrypt_message(
 /// );
 /// const message = new TextDecoder().decode(plaintext);
 /// ```
-#[cfg_attr(coverage_nightly, coverage(off))]
 #[wasm_bindgen]
 pub fn decrypt_message(
     shared_secret: &Uint8Array,
@@ -235,13 +232,11 @@ pub fn decrypt_message(
 
 #[cfg(test)]
 #[allow(dead_code)]
-#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
 
     /// Test message encryption and decryption roundtrip
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_message_encryption_roundtrip() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -267,7 +262,6 @@ mod tests {
     }
 
     /// Test that different message numbers produce different keys and ciphertexts
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_forward_secrecy() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -307,7 +301,6 @@ mod tests {
     }
 
     /// Test that wrong message key fails decryption
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_wrong_key_decryption_fails() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -329,7 +322,6 @@ mod tests {
     }
 
     /// Test error handling for malformed ciphertext
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_short_ciphertext_error() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
@@ -341,7 +333,6 @@ mod tests {
     }
 
     /// Test that same inputs produce different ciphertexts (due to random nonces)
-    #[cfg_attr(coverage_nightly, coverage(off))]
     #[wasm_bindgen_test]
     fn test_nonce_randomization() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
