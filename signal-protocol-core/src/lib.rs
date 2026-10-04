@@ -24,7 +24,7 @@ pub use double_ratchet::{
 pub use error::SignalError;
 pub use keys::{
     generate_ephemeral_keypair, generate_identity_keypair, generate_one_time_prekey,
-    generate_signed_prekey,
+    generate_sign_keypair, generate_signed_prekey, sign_prekey, verify_signed_prekey,
 };
 pub use types::{EncryptionResult, KeyPair, X3DHResult};
 pub use x3dh::{x3dh_initiate_internal, x3dh_respond_internal};

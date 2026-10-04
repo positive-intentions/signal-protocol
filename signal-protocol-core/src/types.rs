@@ -3,7 +3,7 @@
 #[cfg(not(hax_compilation))]
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(not(hax_compilation), derive(Serialize, Deserialize))]
 pub struct KeyPair {
     pub public_key: Vec<u8>,

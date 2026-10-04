@@ -55,6 +55,49 @@ pub fn generate_ephemeral_keypair() -> KeyPair {
     generate_x25519_keypair_internal()
 }
 
+/// Ed25519 signing identity used to bind Signal signed prekeys.
+#[cfg(feature = "crypto-backend")]
+pub fn generate_sign_keypair() -> KeyPair {
+    use ed25519_dalek::SigningKey;
+    let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
+    KeyPair {
+        public_key: signing_key.verifying_key().to_bytes().to_vec(),
+        private_key: signing_key.to_bytes().to_vec(),
+    }
+}
+
+#[cfg(not(feature = "crypto-backend"))]
+pub fn generate_sign_keypair() -> KeyPair {
+    KeyPair {
+        public_key: vec![0u8; 32],
+        private_key: vec![0u8; 32],
+    }
+}
+
+/// Sign the 32-byte Signal signed-prekey public key.
+pub fn sign_prekey(
+    sign_private: &[u8],
+    signed_prekey_public: &[u8],
+) -> Result<Vec<u8>, crate::SignalError> {
+    crate::sign_data_internal(sign_private, signed_prekey_public)
+}
+
+/// Verify a Signal signed-prekey signature.
+pub fn verify_signed_prekey(
+    sign_public: &[u8],
+    signed_prekey_public: &[u8],
+    signature: &[u8],
+) -> Result<(), crate::SignalError> {
+    let ok = crate::verify_signature_internal(sign_public, signature, signed_prekey_public)?;
+    if ok {
+        Ok(())
+    } else {
+        Err(crate::SignalError::SignatureVerification(
+            "signal signed prekey".into(),
+        ))
+    }
+}
+
 #[cfg(all(test, feature = "crypto-backend"))]
 mod tests {
     use super::*;
