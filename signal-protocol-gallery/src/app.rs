@@ -7,7 +7,7 @@ use whatsup_ui::components::pages::{GalleryHome, StoryView};
 use whatsup_ui::components::templates::GalleryShell;
 use whatsup_ui::data::Theme;
 use whatsup_ui::gallery::GalleryHost;
-use whatsup_ui::nav::{Nav, NavTarget};
+use whatsup_ui::nav::Nav;
 use whatsup_ui::state::AppState;
 use whatsup_ui::STYLES;
 
@@ -75,20 +75,7 @@ pub fn App() -> Element {
     let theme = use_context_provider(|| Signal::new(Theme::Light));
     let dark_class = if theme().is_dark() { "dark" } else { "" };
 
-    use_context_provider(|| {
-        Nav::new(
-            |target: &NavTarget| match target {
-                NavTarget::Chats => "/".into(),
-                NavTarget::Chat(_) | NavTarget::ChatFiles(_) => "/".into(),
-                NavTarget::Contacts => "/".into(),
-                NavTarget::Contact(_) | NavTarget::ContactFiles(_) => "/".into(),
-                NavTarget::Calls | NavTarget::Call(_) => "/".into(),
-                NavTarget::Profile => "/".into(),
-                NavTarget::ActiveCall { .. } => "/".into(),
-            },
-            |_target| {},
-        )
-    });
+    use_context_provider(|| Nav::stub("/"));
 
     rsx! {
         document::Meta {
