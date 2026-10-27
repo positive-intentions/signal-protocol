@@ -59,7 +59,14 @@ pub fn x25519_ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u8>, Sig
     let public = X25519PublicKey::from(public_bytes);
 
     let shared_secret = secret.diffie_hellman(&public);
-    Ok(shared_secret.as_bytes().to_vec())
+    let bytes = shared_secret.as_bytes();
+    // SP-2026-010: reject non-contributory / all-zero ECDH output.
+    if bytes.iter().all(|&b| b == 0) {
+        return Err(SignalError::KeyExchange(
+            "X25519 shared secret is all-zero (low-order public key?)".to_string(),
+        ));
+    }
+    Ok(bytes.to_vec())
 }
 
 #[cfg(not(feature = "crypto-backend"))]

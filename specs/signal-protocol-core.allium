@@ -10,7 +10,7 @@
 --   - Non-domain infrastructure (logging, webpack, Docker)
 --
 -- Finding IDs refer to security/SP-2026-library-audit.md.
--- Invariants marked VIOLATED describe intended behaviour the code does not meet.
+-- SP-2026-001–011 are mitigated in-tree; regenerate identities after upgrade.
 -- Open questions are design choices not yet decided.
 
 entity IdentityKey {
@@ -73,8 +73,7 @@ config {
     max_skipped_total: Integer = 1000
 }
 
--- VIOLATED today (SP-2026-008): only a per-call skip cap exists; total map is
--- not enforced unless the application calls cleanup.
+-- Mitigated (SP-2026-008): max_skipped_total enforced with FIFO eviction.
 invariant SkippedKeysAreBounded {
     for s in Sessions:
         s.skipped.count <= config.max_skipped_total
@@ -95,39 +94,39 @@ invariant ResponderCannotSendBeforeReceiving {
             implies s.sending_chain_key = null
 }
 
--- VIOLATED (SP-2026-002, SP-2026-003): state must commit only after AEAD success.
+-- Mitigated (SP-2026-002, SP-2026-003): commit-after-AEAD.
 invariant DecryptCommitsOnlyAfterTag {
     for d in DecryptAttempts:
         d.state_mutated implies d.tag_ok
 }
 
--- VIOLATED (SP-2026-003): skipped keys removed only after successful decrypt.
+-- Mitigated (SP-2026-003): skipped keys removed only after successful decrypt.
 invariant SkippedKeyRemovedOnlyAfterTag {
     for d in DecryptAttempts:
         d.used_skipped_key and d.skipped_key_deleted implies d.tag_ok
 }
 
--- VIOLATED (SP-2026-001): on DH ratchet, retain remaining previous-chain keys via PN.
+-- Mitigated (SP-2026-001): on DH ratchet, retain remaining previous-chain keys via PN.
 invariant PreviousChainKeysRetainedOnRatchet {
     for d in DecryptAttempts:
         d.triggered_dh_ratchet implies
             d.archived_previous_chain_keys_count = d.header.previous_chain_length - d.receiving_chain_length_before
 }
 
--- VIOLATED (SP-2026-004): initiate verifies signed prekey inside the library.
+-- Mitigated (SP-2026-004): initiate verifies signed prekey inside the library.
 invariant SignedPrekeyVerifiedInInitiate {
     for h in Handshakes:
         h.role = initiator implies h.signed_prekey_verified = true
 }
 
--- VIOLATED (SP-2026-005): AD binds both identity public keys and is used in AEAD.
+-- Mitigated (SP-2026-005): AD binds both identity public keys and is used in AEAD.
 invariant AssociatedDataBindsIdentities {
     for s in Sessions:
         s.associated_data = s.peer_identity_public || s.local_identity_public
             or s.associated_data = s.local_identity_public || s.peer_identity_public
 }
 
--- VIOLATED (SP-2026-011) for WASM legacy helper: message keys stay inside the library.
+-- Mitigated (SP-2026-011): message keys stay inside the library (WASM).
 invariant MessageKeyNotExported {
     for e in EncryptResults:
         e.exposed_to_host implies e.message_key = null
@@ -166,12 +165,5 @@ rule DoubleRatchetDecrypt {
         )
 }
 
-open question "Should x3dh_initiate_internal take the signing key and signature and verify the signed prekey itself, so a caller cannot skip it? (SP-2026-004)"
-
-open question "Should the identity key sign with XEdDSA, so there is one long-term key instead of an unbound X25519 and Ed25519 pair? (SP-2026-006)"
-
-open question "Should decrypt work on a copy of the state and commit only after the tag verifies? (SP-2026-002, SP-2026-003)"
-
-open question "Should the associated data be IK_A || IK_B and be passed into every seal and open? (SP-2026-005)"
-
-open question "Should the initiator's first sending chain include a DH ratchet against the responder's ratchet/SPK public key per Double Ratchet §3.3? (SP-2026-007)"
+-- Resolved (SP-2026): SPK verify in initiate; XEdDSA identity; commit-after-AEAD;
+-- IK_A||IK_B AD; initiator first-chain DH with remote SPK. Hard break: regenerate IKs.

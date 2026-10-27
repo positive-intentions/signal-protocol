@@ -11,6 +11,7 @@ crate-type = ["lib"]
 [dependencies]
 x25519-dalek = { version = "2.0", features = ["static_secrets"], optional = true }
 ed25519-dalek = { version = "2.0", features = ["rand_core"], optional = true }
+curve25519-dalek = { version = "4", optional = true }
 sha2 = "0.10"
 hkdf = "0.12"
 aes-gcm = { version = "0.10", optional = true }
@@ -30,7 +31,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ["cfg(hax_compilation)", "cfg(co
 
 [features]
 default = ["crypto-backend"]
-crypto-backend = ["dep:x25519-dalek", "dep:ed25519-dalek", "dep:aes-gcm", "dep:rand"]
+crypto-backend = ["dep:x25519-dalek", "dep:ed25519-dalek", "dep:curve25519-dalek", "dep:aes-gcm", "dep:rand"]
 
 [dev-dependencies]
 hex = "0.4"

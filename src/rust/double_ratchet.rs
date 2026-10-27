@@ -39,6 +39,8 @@ fn core_to_wasm_state(core: signal_protocol_core::DoubleRatchetState) -> DoubleR
         receiving_message_number: core.receiving_message_number,
         previous_chain_length: core.previous_chain_length,
         skipped_message_keys: core.skipped_message_keys,
+        skipped_key_order: core.skipped_key_order,
+        associated_data: core.associated_data,
     }
 }
 
@@ -60,6 +62,8 @@ fn wasm_to_core_state(wasm: &DoubleRatchetState) -> signal_protocol_core::Double
         receiving_message_number: wasm.receiving_message_number,
         previous_chain_length: wasm.previous_chain_length,
         skipped_message_keys: wasm.skipped_message_keys.clone(),
+        skipped_key_order: wasm.skipped_key_order.clone(),
+        associated_data: wasm.associated_data.clone(),
     }
 }
 
@@ -84,6 +88,10 @@ pub struct DoubleRatchetState {
     pub previous_chain_length: u32,
     #[wasm_bindgen(skip)]
     pub skipped_message_keys: BTreeMap<String, Vec<u8>>,
+    #[wasm_bindgen(skip)]
+    pub skipped_key_order: Vec<String>,
+    #[wasm_bindgen(skip)]
+    pub associated_data: Vec<u8>,
 }
 
 #[wasm_bindgen]
@@ -163,6 +171,29 @@ pub fn initialize_double_ratchet(
     signal_protocol_core::initialize_double_ratchet_internal(&shared_secret_bytes, is_initiator)
         .map(core_to_wasm_state)
         .map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+/// Initialize with associated data and optional remote ratchet/SPK public (initiator).
+#[wasm_bindgen]
+pub fn initialize_double_ratchet_with_ad(
+    shared_secret: &Uint8Array,
+    associated_data: &Uint8Array,
+    is_initiator: bool,
+    remote_ratchet_public: Option<Uint8Array>,
+) -> Result<DoubleRatchetState, JsValue> {
+    let shared_secret_bytes = uint8_array_to_vec(shared_secret);
+    let ad_bytes = uint8_array_to_vec(associated_data);
+    let remote = remote_ratchet_public
+        .as_ref()
+        .map(|k| uint8_array_to_vec(k));
+    signal_protocol_core::initialize_double_ratchet_with_ad(
+        &shared_secret_bytes,
+        &ad_bytes,
+        is_initiator,
+        remote.as_ref().map(|v| v.as_slice()),
+    )
+    .map(core_to_wasm_state)
+    .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Derive a message key from a chain key - delegates to core (for tests)

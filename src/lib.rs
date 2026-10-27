@@ -38,8 +38,9 @@ pub mod rust;
 pub use rust::{
     decrypt_message, deserialize_public_key, encrypt_message, free_buffer, free_keypair,
     generate_ephemeral_keypair, generate_identity_keypair, generate_one_time_prekey,
-    generate_signed_prekey, hkdf_derive_key, serialize_public_key, sign_data, verify_signature,
-    x3dh_initiate, x3dh_respond, EncryptionResult, KeyPair, SignalError, X3DHResult,
+    generate_signed_prekey, hkdf_derive_key, serialize_public_key, sign_data, sign_prekey,
+    verify_signature, verify_signed_prekey, x3dh_initiate, x3dh_respond, EncryptionResult, KeyPair,
+    SignalError, X3DHResult,
 };
 
 /// Initialize the WASM module

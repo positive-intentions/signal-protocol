@@ -133,6 +133,36 @@ pub fn generate_ephemeral_keypair() -> Result<KeyPair, JsValue> {
     Ok(generate_x25519_keypair_internal())
 }
 
+/// Sign a signed-prekey public key with the identity private key (XEdDSA).
+#[wasm_bindgen]
+pub fn sign_prekey(
+    identity_private: &js_sys::Uint8Array,
+    signed_prekey_public: &js_sys::Uint8Array,
+) -> Result<js_sys::Uint8Array, JsValue> {
+    use crate::rust::crypto::uint8_array_to_vec;
+    let sk = uint8_array_to_vec(identity_private);
+    let spk = uint8_array_to_vec(signed_prekey_public);
+    match signal_protocol_core::sign_prekey(&sk, &spk) {
+        Ok(sig) => Ok(js_sys::Uint8Array::from(&sig[..])),
+        Err(e) => Err(JsValue::from_str(&e.to_string())),
+    }
+}
+
+/// Verify a signed-prekey signature with the identity public key (XEdDSA).
+#[wasm_bindgen]
+pub fn verify_signed_prekey(
+    identity_public: &js_sys::Uint8Array,
+    signed_prekey_public: &js_sys::Uint8Array,
+    signature: &js_sys::Uint8Array,
+) -> Result<(), JsValue> {
+    use crate::rust::crypto::uint8_array_to_vec;
+    let pk = uint8_array_to_vec(identity_public);
+    let spk = uint8_array_to_vec(signed_prekey_public);
+    let sig = uint8_array_to_vec(signature);
+    signal_protocol_core::verify_signed_prekey(&pk, &spk, &sig)
+        .map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
 #[cfg(test)]
 #[allow(dead_code)]
 mod tests {

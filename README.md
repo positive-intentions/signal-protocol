@@ -4,7 +4,7 @@
 <img src="signal.png" alt="App Logo" />
 </div>
 
-> **Warning:** This project is open source for transparency and education. An in-house library review ([`security/SP-2026-library-audit.md`](security/SP-2026-library-audit.md)) found High-severity Double Ratchet and X3DH issues. It is **not** an independent firm audit. Do not use this crate for production messaging until those findings are fixed. Use at your own risk.
+> **Warning:** Research-grade, not an independent firm audit. [SP-2026](security/SP-2026-library-audit.md) findings are **mitigated** in-tree (commit-after-AEAD, PN skip, X3DH SPK verify, XEdDSA identity, IK-bound AD). **Hard break:** regenerate identities / re-pair after upgrade. Still not libsignal wire-compatible; use at your own risk.
 
 <div align="center">
   
