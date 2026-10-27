@@ -4,11 +4,11 @@
 <img src="signal.png" alt="App Logo" />
 </div>
 
-> **Warning:** This project has not been audited or security-reviewed. It is open source for transparency and educational purposes. Use at your own risk.
+> **Warning:** This project is open source for transparency and education. An in-house library review ([`security/SP-2026-library-audit.md`](security/SP-2026-library-audit.md)) found High-severity Double Ratchet and X3DH issues. It is **not** an independent firm audit. Do not use this crate for production messaging until those findings are fixed. Use at your own risk.
 
 <div align="center">
   
-[Demo](https://signal.positive-intentions.com) | [Docs](https://positive-intentions.com/docs/technical/p2p-signal-protocol/) | [Audit](https://positive-intentions.com/docs/research/Security%20audit/signal-protocol-security-audit/) | [Formal Proof](https://positive-intentions.com/docs/technical/signal-protocol-formal-verification/) | [Reddit](https://www.reddit.com/r/positive_intentions) | <a rel="me" href="https://infosec.exchange/@xoron">Mastodon</a>
+[Demo](https://signal.positive-intentions.com) | [Docs](https://positive-intentions.com/docs/technical/cryptography/) | [Library audit](security/SP-2026-library-audit.md) | [Behavioural specs](specs/) | [Formal verification](https://positive-intentions.com/docs/technical/formal-verification/signal-protocol) | [Reddit](https://www.reddit.com/r/positive_intentions) | <a rel="me" href="https://infosec.exchange/@xoron">Mastodon</a>
 </div>
 
 <div align="center">

@@ -1,0 +1,177 @@
+-- allium: 3
+-- signal-protocol-core.allium
+--
+-- Scope: behavioural contract for signal-protocol-core X3DH + Double Ratchet.
+-- Includes: handshake entities, session ratchet rules, skipped-key handling,
+--           associated-data binding, signed-prekey verification.
+-- Excludes:
+--   - WASM/JS storybook and gallery UI
+--   - Formal-proof stub builds without crypto-backend
+--   - Non-domain infrastructure (logging, webpack, Docker)
+--
+-- Finding IDs refer to security/SP-2026-library-audit.md.
+-- Invariants marked VIOLATED describe intended behaviour the code does not meet.
+-- Open questions are design choices not yet decided.
+
+entity IdentityKey {
+    public: Bytes
+    private: Bytes
+}
+
+entity SignedPrekey {
+    public: Bytes
+    private: Bytes
+    signature: Bytes?
+    signing_public: Bytes?
+}
+
+entity OneTimePrekey {
+    public: Bytes
+    private: Bytes
+}
+
+entity PrekeyBundle {
+    identity: IdentityKey
+    signed_prekey: SignedPrekey
+    one_time_prekey: OneTimePrekey?
+}
+
+entity Session {
+    role: initiator | responder
+    root_key: Bytes
+    sending_chain_key: Bytes?
+    receiving_chain_key: Bytes?
+    sending_dh_public: Bytes?
+    receiving_dh_public: Bytes?
+    sending_message_number: Integer
+    receiving_message_number: Integer
+    previous_chain_length: Integer
+    skipped: SkippedMessageKey
+    associated_data: Bytes
+}
+
+entity SkippedMessageKey {
+    session: Session
+    ratchet_public: Bytes
+    message_number: Integer
+    message_key: Bytes
+}
+
+entity RatchetHeader {
+    dh_public: Bytes
+    message_number: Integer
+    previous_chain_length: Integer
+}
+
+entity CiphertextMessage {
+    header: RatchetHeader
+    body: Bytes
+}
+
+config {
+    max_skip_per_chain: Integer = 1000
+    max_skipped_total: Integer = 1000
+}
+
+-- VIOLATED today (SP-2026-008): only a per-call skip cap exists; total map is
+-- not enforced unless the application calls cleanup.
+invariant SkippedKeysAreBounded {
+    for s in Sessions:
+        s.skipped.count <= config.max_skipped_total
+}
+
+-- Desired: one-time prekeys are not reused across handshakes (application + library).
+invariant OneTimePreKeysBelongToOneSession {
+    for a in Handshakes:
+        for b in Handshakes:
+            a != b and a.one_time_prekey != null
+                implies a.one_time_prekey != b.one_time_prekey
+}
+
+-- Desired: responder does not send before establishing a receiving ratchet.
+invariant ResponderCannotSendBeforeReceiving {
+    for s in Sessions:
+        s.role = responder and s.receiving_dh_public = null
+            implies s.sending_chain_key = null
+}
+
+-- VIOLATED (SP-2026-002, SP-2026-003): state must commit only after AEAD success.
+invariant DecryptCommitsOnlyAfterTag {
+    for d in DecryptAttempts:
+        d.state_mutated implies d.tag_ok
+}
+
+-- VIOLATED (SP-2026-003): skipped keys removed only after successful decrypt.
+invariant SkippedKeyRemovedOnlyAfterTag {
+    for d in DecryptAttempts:
+        d.used_skipped_key and d.skipped_key_deleted implies d.tag_ok
+}
+
+-- VIOLATED (SP-2026-001): on DH ratchet, retain remaining previous-chain keys via PN.
+invariant PreviousChainKeysRetainedOnRatchet {
+    for d in DecryptAttempts:
+        d.triggered_dh_ratchet implies
+            d.archived_previous_chain_keys_count = d.header.previous_chain_length - d.receiving_chain_length_before
+}
+
+-- VIOLATED (SP-2026-004): initiate verifies signed prekey inside the library.
+invariant SignedPrekeyVerifiedInInitiate {
+    for h in Handshakes:
+        h.role = initiator implies h.signed_prekey_verified = true
+}
+
+-- VIOLATED (SP-2026-005): AD binds both identity public keys and is used in AEAD.
+invariant AssociatedDataBindsIdentities {
+    for s in Sessions:
+        s.associated_data = s.peer_identity_public || s.local_identity_public
+            or s.associated_data = s.local_identity_public || s.peer_identity_public
+}
+
+-- VIOLATED (SP-2026-011) for WASM legacy helper: message keys stay inside the library.
+invariant MessageKeyNotExported {
+    for e in EncryptResults:
+        e.exposed_to_host implies e.message_key = null
+}
+
+rule X3DHInitiate {
+    when: InitiatorReceivesPrekeyBundle(bundle)
+
+    requires: exists bundle.identity
+    requires: exists bundle.signed_prekey
+    -- intended: library verifies signature before DH
+    requires: SignedPrekeySignatureValid(bundle)
+
+    ensures:
+        let session = Session.created(
+            role: initiator,
+            associated_data: IdentityAssociatedData(bundle.identity, initiator.identity)
+        )
+        Handshake.created(session: session, one_time_prekey: bundle.one_time_prekey)
+}
+
+rule DoubleRatchetDecrypt {
+    when: SessionReceivesCiphertext(session, message)
+
+    requires: exists session
+
+    ensures:
+        -- intended control flow (not current code):
+        -- 1) try skipped keys without deleting until tag ok
+        -- 2) if new DH: archive previous chain using PN, then ratchet on a tentative copy
+        -- 3) derive message key, AEAD open, commit state only if tag ok
+        DecryptAttempt.created(
+            session: session,
+            header: message.header,
+            tag_ok: true
+        )
+}
+
+open question "Should x3dh_initiate_internal take the signing key and signature and verify the signed prekey itself, so a caller cannot skip it? (SP-2026-004)"
+
+open question "Should the identity key sign with XEdDSA, so there is one long-term key instead of an unbound X25519 and Ed25519 pair? (SP-2026-006)"
+
+open question "Should decrypt work on a copy of the state and commit only after the tag verifies? (SP-2026-002, SP-2026-003)"
+
+open question "Should the associated data be IK_A || IK_B and be passed into every seal and open? (SP-2026-005)"
+
+open question "Should the initiator's first sending chain include a DH ratchet against the responder's ratchet/SPK public key per Double Ratchet §3.3? (SP-2026-007)"
