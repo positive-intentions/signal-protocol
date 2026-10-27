@@ -52,7 +52,7 @@ teach-back logs, and Docs that match the live steps.
 |------|-----------|
 | Key generation | `generate_*`, `validate_x25519_public_key` |
 | X3DH handshake | `x3dh_initiate_internal`, `x3dh_respond_internal` |
-| Double Ratchet playground | `initialize_double_ratchet_internal`, encrypt/decrypt |
+| Double Ratchet playground | `test_ratchet_pair`, encrypt/decrypt |
 | Skipped / out-of-order | skip-key decrypt path |
 | Full session | X3DH → DR → multi-message transcript |
 | Error surface | negative paths → `SignalError` |

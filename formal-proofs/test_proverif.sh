@@ -40,6 +40,7 @@ run_test "proverif/double_ratchet/double_ratchet_dr.pv" "Double Ratchet State Tr
 run_test "proverif/double_ratchet/double_ratchet_key_derivation.pv" "Double Ratchet Key Derivation"
 run_test "proverif/double_ratchet/double_ratchet_security.pv" "Double Ratchet Security Properties"
 run_test "proverif/signal_protocol_complete.pv" "Complete Signal Protocol"
+run_test "proverif/sp2026_hardening.pv" "SP-2026 Hardening (SPK/AD/OTPK/commit)"
 
 # Summary
 echo ""

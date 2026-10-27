@@ -18,10 +18,9 @@ pub use crypto::{
 };
 pub use double_ratchet::{
     cleanup_skipped_message_keys_internal, derive_message_key, derive_next_chain_key,
-    double_ratchet_decrypt_internal, double_ratchet_encrypt_internal,
-    initialize_double_ratchet_full, initialize_double_ratchet_internal,
-    initialize_double_ratchet_with_ad, perform_dh_ratchet_step,
-    skip_message_keys, DoubleRatchetMessage, DoubleRatchetState,
+    double_ratchet_decrypt_internal, double_ratchet_encrypt_internal, initialize_double_ratchet,
+    perform_dh_ratchet_step, skip_message_keys, test_ratchet_pair, DoubleRatchetMessage,
+    DoubleRatchetState, RatchetRole,
 };
 pub use error::SignalError;
 pub use keys::{

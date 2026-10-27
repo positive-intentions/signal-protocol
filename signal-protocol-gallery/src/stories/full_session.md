@@ -34,5 +34,5 @@ bob_msg: Hey Alice — ratchet works.
 | Step | Core API |
 |------|----------|
 | 1 | `x3dh_initiate_internal`, `x3dh_respond_internal` |
-| 2 | `initialize_double_ratchet_internal` |
+| 2 | `test_ratchet_pair` |
 | 3–5 | `double_ratchet_encrypt_internal`, `double_ratchet_decrypt_internal` |

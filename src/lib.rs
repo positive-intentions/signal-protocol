@@ -36,11 +36,12 @@ pub mod rust;
 
 // Re-export all public types and functions for JavaScript access
 pub use rust::{
-    decrypt_message, deserialize_public_key, encrypt_message, free_buffer, free_keypair,
-    generate_ephemeral_keypair, generate_identity_keypair, generate_one_time_prekey,
-    generate_signed_prekey, hkdf_derive_key, serialize_public_key, sign_data, sign_prekey,
-    verify_signature, verify_signed_prekey, x3dh_initiate, x3dh_respond, EncryptionResult, KeyPair,
-    SignalError, X3DHResult,
+    cleanup_skipped_message_keys, deserialize_public_key, double_ratchet_decrypt,
+    double_ratchet_encrypt, free_buffer, free_keypair, generate_ephemeral_keypair,
+    generate_identity_keypair, generate_one_time_prekey, generate_signed_prekey, hkdf_derive_key,
+    initialize_double_ratchet_initiator, initialize_double_ratchet_responder, serialize_public_key,
+    sign_data, sign_prekey, verify_signature, verify_signed_prekey, x3dh_initiate, x3dh_respond,
+    DoubleRatchetMessage, DoubleRatchetState, EncryptionResult, KeyPair, SignalError, X3DHResult,
 };
 
 /// Initialize the WASM module

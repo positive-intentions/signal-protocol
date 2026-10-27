@@ -1,0 +1,90 @@
+(******************************************************************
+ * SP-2026 hardening properties (standalone).
+ *
+ * Models the intended control flow after fail-closed init,
+ * IK-bound AD, commit-after-AEAD, and single-use OTPK.
+ * Bob's identity is known out-of-band (Alice only completes for pk(skB)).
+ ******************************************************************)
+
+type skey.
+type pkey.
+
+free c: channel.
+
+fun pk(skey): pkey.
+fun pk_bytes(pkey): bitstring.
+fun sign(bitstring, skey): bitstring.
+fun checksign(bitstring, pkey, bitstring): bool
+reduc forall m: bitstring, k: skey; checksign(sign(m, k), pk(k), m) = true.
+
+fun dh(skey, pkey): bitstring.
+equation forall x: skey, y: skey; dh(x, pk(y)) = dh(y, pk(x)).
+
+fun aead_enc(bitstring, bitstring, bitstring): bitstring.
+reduc forall k: bitstring, m: bitstring, ad: bitstring;
+  aead_dec(k, aead_enc(k, m, ad), ad) = m.
+
+fun concat(bitstring, bitstring): bitstring.
+fun hkdf(bitstring): bitstring.
+
+event bob_signed_spk(pkey, bitstring).
+event alice_completed(bitstring).
+event message_sent(bitstring, bitstring, bitstring).
+event state_advanced(bitstring).
+event otpk_issued(bitstring).
+event otpk_used(bitstring).
+
+free skA: skey [private].
+free skB: skey [private].
+free msg: bitstring [private].
+
+query attacker(msg).
+
+query spk: bitstring;
+  inj-event(alice_completed(spk)) ==> inj-event(bob_signed_spk(pk(skB), spk)).
+
+query m: bitstring, ad: bitstring, ct: bitstring;
+  inj-event(state_advanced(ct)) ==> inj-event(message_sent(m, ad, ct)).
+
+query o: bitstring;
+  inj-event(otpk_used(o)) ==> inj-event(otpk_issued(o)).
+
+let bob =
+  new spk: bitstring;
+  new otpk: bitstring;
+  let sig = sign(spk, skB) in
+  event bob_signed_spk(pk(skB), spk);
+  event otpk_issued(otpk);
+  out(c, (pk(skB), spk, sig, otpk));
+  in(c, (ct: bitstring, ikA: pkey, used_otpk: bitstring));
+  if ikA = pk(skA) then
+  if used_otpk = otpk then
+  (
+    event otpk_used(otpk);
+    let ad = concat(pk_bytes(ikA), pk_bytes(pk(skB))) in
+    let k = hkdf(dh(skB, ikA)) in
+    let m = aead_dec(k, ct, ad) in
+    if m = msg then
+      event state_advanced(ct)
+  ).
+
+let alice =
+  in(c, (ikB: pkey, spk: bitstring, sig: bitstring, o: bitstring));
+  if ikB = pk(skB) then
+  if checksign(sig, ikB, spk) = true then
+  (
+    event alice_completed(spk);
+    let ad = concat(pk_bytes(pk(skA)), pk_bytes(ikB)) in
+    let k = hkdf(dh(skA, ikB)) in
+    let ct = aead_enc(k, msg, ad) in
+    event message_sent(msg, ad, ct);
+    out(c, (ct, pk(skA), o))
+  ).
+
+(* Forged ciphertext (junk body) must not advance Bob. *)
+let adversary_forge =
+  in(c, (ikB: pkey, spk: bitstring, sig: bitstring, o: bitstring));
+  out(c, (spk, pk(skA), o)).
+
+process
+  (bob) | (alice) | (adversary_forge)

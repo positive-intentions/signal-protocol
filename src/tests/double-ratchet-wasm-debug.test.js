@@ -4,6 +4,23 @@
  */
 
 describe("WASM Double Ratchet Debug Tests", () => {
+  function initRatchetPair(wasmModule, sharedSecret, ad) {
+    const adBytes =
+      ad || new TextEncoder().encode("IK_A||IK_B_test_ad______________");
+    const spk = wasmModule.generate_signed_prekey();
+    const alice = wasmModule.initialize_double_ratchet_initiator(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+    );
+    const bob = wasmModule.initialize_double_ratchet_responder(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+      spk.private_key,
+    );
+    return { alice, bob, spk, ad: adBytes };
+  }
   let wasmModule;
   let sharedSecret;
 
@@ -16,22 +33,30 @@ describe("WASM Double Ratchet Debug Tests", () => {
         let stateCounter = 0;
         const stateObjects = new Map();
 
+        const makeState = (isInitiator) => {
+          const stateId = ++stateCounter;
+          const state = {
+            _id: stateId,
+            sending_message_number: 0,
+            receiving_message_number: 0,
+            is_initiator: isInitiator,
+            root_key: new Uint8Array(32),
+            skipped_keys_count: 0,
+          };
+          stateObjects.set(stateId, state);
+          return state;
+        };
         wasmModule = {
-          initialize_double_ratchet: jest
+          generate_signed_prekey: jest.fn().mockReturnValue({
+            public_key: new Uint8Array(32),
+            private_key: new Uint8Array(32),
+          }),
+          initialize_double_ratchet_initiator: jest
             .fn()
-            .mockImplementation((sharedSecret, isInitiator) => {
-              const stateId = ++stateCounter;
-              const state = {
-                _id: stateId,
-                sending_message_number: 0,
-                receiving_message_number: 0,
-                is_initiator: isInitiator,
-                root_key: new Uint8Array(32),
-                skipped_keys_count: 0,
-              };
-              stateObjects.set(stateId, state);
-              return state;
-            }),
+            .mockImplementation(() => makeState(true)),
+          initialize_double_ratchet_responder: jest
+            .fn()
+            .mockImplementation(() => makeState(false)),
           double_ratchet_encrypt: jest.fn().mockReturnValue({
             ciphertext: new Uint8Array(16),
             dh_public_key: new Uint8Array(32),
@@ -64,6 +89,10 @@ describe("WASM Double Ratchet Debug Tests", () => {
               return messages[call - 1] || `decrypted-${call}`;
             }),
         };
+        sharedSecret = new Uint8Array(32);
+        for (let i = 0; i < 32; i++) {
+          sharedSecret[i] = i + 1;
+        }
         return;
       }
 
@@ -98,7 +127,7 @@ describe("WASM Double Ratchet Debug Tests", () => {
 
     // Initialize Alice (initiator)
     console.log("🧪 Initializing Alice as initiator...");
-    const aliceState = wasmModule.initialize_double_ratchet(sharedSecret, true);
+    const aliceState = initRatchetPair(wasmModule, sharedSecret).alice;
 
     console.log("📊 Alice state properties:");
     console.log("  - Root key exists:", !!aliceState.root_key);
@@ -115,7 +144,7 @@ describe("WASM Double Ratchet Debug Tests", () => {
 
     // Initialize Bob (responder)
     console.log("\n🧪 Initializing Bob as responder...");
-    const bobState = wasmModule.initialize_double_ratchet(sharedSecret, false);
+    const bobState = initRatchetPair(wasmModule, sharedSecret).bob;
 
     console.log("📊 Bob state properties:");
     console.log("  - Root key exists:", !!bobState.root_key);
@@ -140,8 +169,10 @@ describe("WASM Double Ratchet Debug Tests", () => {
     console.log("\n🔍 Testing first message from Alice to Bob...");
 
     // Initialize states
-    const aliceState = wasmModule.initialize_double_ratchet(sharedSecret, true);
-    const bobState = wasmModule.initialize_double_ratchet(sharedSecret, false);
+    const { alice: aliceState, bob: bobState } = initRatchetPair(
+      wasmModule,
+      sharedSecret,
+    );
 
     const message = "Hello Bob from Alice!";
     console.log("📤 Alice encrypting message:", message);
@@ -221,8 +252,10 @@ describe("WASM Double Ratchet Debug Tests", () => {
   test("should handle bidirectional conversation", () => {
     console.log("\n🔍 Testing bidirectional conversation...");
 
-    const aliceState = wasmModule.initialize_double_ratchet(sharedSecret, true);
-    const bobState = wasmModule.initialize_double_ratchet(sharedSecret, false);
+    const { alice: aliceState, bob: bobState } = initRatchetPair(
+      wasmModule,
+      sharedSecret,
+    );
 
     // Message 1: Alice -> Bob
     console.log("\n📤 Step 1: Alice -> Bob");
@@ -293,8 +326,10 @@ describe("WASM Double Ratchet Debug Tests", () => {
   test("should debug DH ratchet step process", () => {
     console.log("\n🔍 Deep debugging of DH ratchet step...");
 
-    const aliceState = wasmModule.initialize_double_ratchet(sharedSecret, true);
-    const bobState = wasmModule.initialize_double_ratchet(sharedSecret, false);
+    const { alice: aliceState, bob: bobState } = initRatchetPair(
+      wasmModule,
+      sharedSecret,
+    );
 
     // Alice sends message to establish communication
     console.log("📤 Alice establishes communication...");

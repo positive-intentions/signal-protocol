@@ -4,6 +4,23 @@
  */
 
 describe("Double Ratchet WASM Flow Reproduction", () => {
+  function initRatchetPair(wasmModule, sharedSecret, ad) {
+    const adBytes =
+      ad || new TextEncoder().encode("IK_A||IK_B_test_ad______________");
+    const spk = wasmModule.generate_signed_prekey();
+    const alice = wasmModule.initialize_double_ratchet_initiator(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+    );
+    const bob = wasmModule.initialize_double_ratchet_responder(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+      spk.private_key,
+    );
+    return { alice, bob, spk, ad: adBytes };
+  }
   let wasmModule;
   let sharedSecret;
 
@@ -13,7 +30,16 @@ describe("Double Ratchet WASM Flow Reproduction", () => {
       if (typeof jest !== "undefined") {
         console.log("🔄 Using mock WASM module for Jest tests");
         wasmModule = {
-          initialize_double_ratchet: jest.fn().mockReturnValue("mock-state"),
+          initialize_double_ratchet_initiator: jest
+            .fn()
+            .mockReturnValue("mock-state"),
+          initialize_double_ratchet_responder: jest
+            .fn()
+            .mockReturnValue("mock-state"),
+          generate_signed_prekey: jest.fn().mockReturnValue({
+            public_key: new Uint8Array(32),
+            private_key: new Uint8Array(32),
+          }),
           double_ratchet_encrypt: jest.fn().mockReturnValue("mock-encrypted"),
           double_ratchet_decrypt: jest
             .fn()
@@ -51,19 +77,14 @@ describe("Double Ratchet WASM Flow Reproduction", () => {
     console.log("2. ✅ X3DH key exchange completes (JS implementation)");
     console.log("3. ✅ Shared secret: 32 bytes converted to Uint8Array");
 
-    // Initialize Alice and Bob states
+    // Initialize Alice and Bob states (shared SPK via initRatchetPair)
     console.log("4. ✅ Alice WASM state initialized (initiator)");
     const sharedSecretMock = new Uint8Array(32);
-    const aliceState = wasmModule.initialize_double_ratchet(
+    const { alice: aliceState, bob: bobState } = initRatchetPair(
+      wasmModule,
       sharedSecretMock,
-      true,
     );
-
     console.log("5. ✅ Bob WASM state initialized (responder)");
-    const bobState = wasmModule.initialize_double_ratchet(
-      sharedSecretMock,
-      false,
-    );
 
     console.log("6. ✅ Alice encrypts message via WASM");
     const message = "Hello Bob from Alice!";
@@ -82,15 +103,8 @@ describe("Double Ratchet WASM Flow Reproduction", () => {
     );
 
     if (typeof jest !== "undefined") {
-      // In Jest environment with mocks, verify the functions were called
-      expect(wasmModule.initialize_double_ratchet).toHaveBeenCalledWith(
-        sharedSecretMock,
-        true,
-      );
-      expect(wasmModule.initialize_double_ratchet).toHaveBeenCalledWith(
-        sharedSecretMock,
-        false,
-      );
+      expect(wasmModule.initialize_double_ratchet_initiator).toHaveBeenCalled();
+      expect(wasmModule.initialize_double_ratchet_responder).toHaveBeenCalled();
       expect(wasmModule.double_ratchet_encrypt).toHaveBeenCalledWith(
         aliceState,
         message,

@@ -206,12 +206,11 @@ mod native_tests {
         double_ratchet::{
             cleanup_skipped_message_keys_internal, derive_message_key, derive_next_chain_key,
             double_ratchet_decrypt_internal, double_ratchet_encrypt_internal,
-            initialize_double_ratchet_internal, perform_dh_ratchet_step, skip_message_keys,
-            DoubleRatchetMessage, DoubleRatchetState,
+            perform_dh_ratchet_step, skip_message_keys, test_ratchet_pair, DoubleRatchetMessage,
+            DoubleRatchetState,
         },
         error::*,
         keys::generate_x25519_keypair_internal,
-        messages::{decrypt_message_internal, encrypt_message_internal},
         types::*,
         utils::{
             deserialize_public_key_internal, hkdf_derive_key_internal,
@@ -679,12 +678,22 @@ mod native_tests {
         assert_eq!(shared_ab.len(), 32);
     }
 
+    fn expected_x3dh_ad(alice_identity_public: &[u8], bob_identity_public: &[u8]) -> Vec<u8> {
+        let mut ad = alice_identity_public.to_vec();
+        ad.extend_from_slice(bob_identity_public);
+        ad
+    }
+
     // Test X3DH functions
     #[test]
     fn test_x3dh_internal_rejects_bad_key_length() {
-        let err = x3dh_initiate_internal(&[0u8; 16], &[0u8; 32], &[0u8; 32], &[0u8; 32], None);
+        let err = x3dh_initiate_internal(
+            &[0u8; 16], &[0u8; 32], &[0u8; 32], &[0u8; 32], &[0u8; 32], &[0u8; 64], None,
+        );
         assert!(err.is_err());
-        let err = x3dh_respond_internal(&[0u8; 16], &[0u8; 32], None, &[0u8; 32], &[0u8; 32]);
+        let err = x3dh_respond_internal(
+            &[0u8; 16], &[0u8; 32], None, &[0u8; 32], &[0u8; 32], &[0u8; 32],
+        );
         assert!(err.is_err());
     }
 
@@ -695,19 +704,29 @@ mod native_tests {
         let alice_ephemeral = generate_x25519_keypair_internal();
         let bob_identity = generate_x25519_keypair_internal();
         let bob_signed_prekey = generate_x25519_keypair_internal();
+        let bob_spk_sig = signal_protocol_core::sign_prekey(
+            &bob_identity.private_key,
+            &bob_signed_prekey.public_key,
+        )
+        .unwrap();
 
         // Alice initiates X3DH without one-time prekey
         let result = x3dh_initiate_internal(
             &alice_identity.private_key,
             &alice_ephemeral.private_key,
+            &alice_identity.public_key,
             &bob_identity.public_key,
             &bob_signed_prekey.public_key,
+            &bob_spk_sig,
             None,
         )
         .unwrap();
 
         assert_eq!(result.shared_secret.len(), 32);
-        assert_eq!(result.associated_data, b"X3DH_Key_Exchange".to_vec());
+        assert_eq!(
+            result.associated_data,
+            expected_x3dh_ad(&alice_identity.public_key, &bob_identity.public_key)
+        );
     }
 
     #[test]
@@ -718,19 +737,29 @@ mod native_tests {
         let bob_identity = generate_x25519_keypair_internal();
         let bob_signed_prekey = generate_x25519_keypair_internal();
         let bob_one_time_prekey = generate_x25519_keypair_internal();
+        let bob_spk_sig = signal_protocol_core::sign_prekey(
+            &bob_identity.private_key,
+            &bob_signed_prekey.public_key,
+        )
+        .unwrap();
 
         // Alice initiates X3DH with one-time prekey
         let result = x3dh_initiate_internal(
             &alice_identity.private_key,
             &alice_ephemeral.private_key,
+            &alice_identity.public_key,
             &bob_identity.public_key,
             &bob_signed_prekey.public_key,
+            &bob_spk_sig,
             Some(&bob_one_time_prekey.public_key),
         )
         .unwrap();
 
         assert_eq!(result.shared_secret.len(), 32);
-        assert_eq!(result.associated_data, b"X3DH_Key_Exchange".to_vec());
+        assert_eq!(
+            result.associated_data,
+            expected_x3dh_ad(&alice_identity.public_key, &bob_identity.public_key)
+        );
     }
 
     #[test]
@@ -746,13 +775,17 @@ mod native_tests {
             &bob_identity.private_key,
             &bob_signed_prekey.private_key,
             None,
+            &bob_identity.public_key,
             &alice_identity.public_key,
             &alice_ephemeral.public_key,
         )
         .unwrap();
 
         assert_eq!(result.shared_secret.len(), 32);
-        assert_eq!(result.associated_data, b"X3DH_Key_Exchange".to_vec());
+        assert_eq!(
+            result.associated_data,
+            expected_x3dh_ad(&alice_identity.public_key, &bob_identity.public_key)
+        );
     }
 
     #[test]
@@ -769,13 +802,17 @@ mod native_tests {
             &bob_identity.private_key,
             &bob_signed_prekey.private_key,
             Some(&bob_one_time_prekey.private_key),
+            &bob_identity.public_key,
             &alice_identity.public_key,
             &alice_ephemeral.public_key,
         )
         .unwrap();
 
         assert_eq!(result.shared_secret.len(), 32);
-        assert_eq!(result.associated_data, b"X3DH_Key_Exchange".to_vec());
+        assert_eq!(
+            result.associated_data,
+            expected_x3dh_ad(&alice_identity.public_key, &bob_identity.public_key)
+        );
     }
 
     #[test]
@@ -786,13 +823,20 @@ mod native_tests {
         let bob_identity = generate_x25519_keypair_internal();
         let bob_signed_prekey = generate_x25519_keypair_internal();
         let bob_one_time_prekey = generate_x25519_keypair_internal();
+        let bob_spk_sig = signal_protocol_core::sign_prekey(
+            &bob_identity.private_key,
+            &bob_signed_prekey.public_key,
+        )
+        .unwrap();
 
         // Alice initiates
         let alice_result = x3dh_initiate_internal(
             &alice_identity.private_key,
             &alice_ephemeral.private_key,
+            &alice_identity.public_key,
             &bob_identity.public_key,
             &bob_signed_prekey.public_key,
+            &bob_spk_sig,
             Some(&bob_one_time_prekey.public_key),
         )
         .unwrap();
@@ -802,6 +846,7 @@ mod native_tests {
             &bob_identity.private_key,
             &bob_signed_prekey.private_key,
             Some(&bob_one_time_prekey.private_key),
+            &bob_identity.public_key,
             &alice_identity.public_key,
             &alice_ephemeral.public_key,
         )
@@ -813,131 +858,19 @@ mod native_tests {
             "X3DH must be symmetric"
         );
         assert_eq!(alice_result.associated_data, bob_result.associated_data);
+        assert_eq!(
+            alice_result.associated_data,
+            expected_x3dh_ad(&alice_identity.public_key, &bob_identity.public_key)
+        );
     }
 
-    // Test message encryption/decryption functions
-    #[test]
-    fn test_encrypt_message_internal() {
-        let shared_secret = vec![1u8; 32];
-        let plaintext = b"Hello, Signal Protocol!";
-        let message_number = 1;
-
-        let result = encrypt_message_internal(&shared_secret, plaintext, message_number).unwrap();
-
-        assert!(result.ciphertext.len() > plaintext.len()); // Should be larger due to nonce + auth tag
-        assert_eq!(result.message_key.len(), 32); // 256-bit key
-        assert!(result.ciphertext.len() >= 12); // At least nonce size
+    fn ratchet_ad() -> &'static [u8] {
+        b"IK_A||IK_B_test_ad______________"
     }
 
-    #[test]
-    fn test_decrypt_message_internal() {
-        let shared_secret = vec![1u8; 32];
-        let plaintext = b"Test message for decryption";
-        let message_number = 1;
-
-        // Encrypt the message
-        let encryption_result =
-            encrypt_message_internal(&shared_secret, plaintext, message_number).unwrap();
-
-        // Decrypt the message
-        let decrypted = decrypt_message_internal(
-            &encryption_result.ciphertext,
-            &encryption_result.message_key,
-        )
-        .unwrap();
-
-        // Verify decryption worked correctly
-        assert_eq!(decrypted, plaintext);
-    }
-
-    #[test]
-    fn test_message_encryption_roundtrip() {
-        let shared_secret = vec![1u8; 32];
-        let plaintext = b"Roundtrip test message";
-        let message_number = 42;
-
-        // Encrypt
-        let encryption_result =
-            encrypt_message_internal(&shared_secret, plaintext, message_number).unwrap();
-
-        // Decrypt
-        let decrypted = decrypt_message_internal(
-            &encryption_result.ciphertext,
-            &encryption_result.message_key,
-        )
-        .unwrap();
-
-        // Verify
-        assert_eq!(decrypted, plaintext);
-    }
-
-    #[test]
-    fn test_forward_secrecy_different_message_numbers() {
-        let shared_secret = vec![1u8; 32];
-        let plaintext = b"Same message";
-
-        // Encrypt same message with different message numbers
-        let result1 = encrypt_message_internal(&shared_secret, plaintext, 1).unwrap();
-        let result2 = encrypt_message_internal(&shared_secret, plaintext, 2).unwrap();
-
-        // Message keys should be different (forward secrecy)
-        assert_ne!(result1.message_key, result2.message_key);
-
-        // Ciphertexts should be different (due to different keys and nonces)
-        assert_ne!(result1.ciphertext, result2.ciphertext);
-
-        // But both should decrypt to the same plaintext
-        let decrypted1 =
-            decrypt_message_internal(&result1.ciphertext, &result1.message_key).unwrap();
-        let decrypted2 =
-            decrypt_message_internal(&result2.ciphertext, &result2.message_key).unwrap();
-
-        assert_eq!(decrypted1, plaintext);
-        assert_eq!(decrypted2, plaintext);
-    }
-
-    #[test]
-    fn test_wrong_key_decryption_fails() {
-        let shared_secret = vec![1u8; 32];
-        let plaintext = b"Secret message";
-        let message_number = 1;
-
-        // Encrypt with correct key
-        let encryption_result =
-            encrypt_message_internal(&shared_secret, plaintext, message_number).unwrap();
-
-        // Try to decrypt with wrong key
-        let wrong_key = vec![2u8; 32];
-        let decrypt_result = decrypt_message_internal(&encryption_result.ciphertext, &wrong_key);
-
-        // Decryption should fail with wrong key
-        assert!(decrypt_result.is_err());
-    }
-
-    #[test]
-    fn test_short_ciphertext_error() {
-        let message_key = vec![1u8; 32];
-        let short_ciphertext = vec![1u8; 8]; // Too short for nonce
-
-        let result = decrypt_message_internal(&short_ciphertext, &message_key);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_nonce_randomization() {
-        let shared_secret = vec![1u8; 32];
-        let plaintext = b"Same message";
-        let message_number = 1;
-
-        // Encrypt same message twice with same parameters
-        let result1 = encrypt_message_internal(&shared_secret, plaintext, message_number).unwrap();
-        let result2 = encrypt_message_internal(&shared_secret, plaintext, message_number).unwrap();
-
-        // Should produce different ciphertexts due to random nonces
-        assert_ne!(result1.ciphertext, result2.ciphertext);
-
-        // But same message keys (deterministic derivation)
-        assert_eq!(result1.message_key, result2.message_key);
+    fn ratchet_pair() -> (DoubleRatchetState, DoubleRatchetState) {
+        let (alice, bob, _) = test_ratchet_pair(&[1u8; 32], ratchet_ad()).unwrap();
+        (alice, bob)
     }
 
     // Test double ratchet helper functions
@@ -1026,15 +959,12 @@ mod native_tests {
     #[test]
     fn test_encryption_result_creation() {
         let ciphertext = vec![1u8; 64];
-        let message_key = vec![2u8; 32];
 
         let result = EncryptionResult {
             ciphertext: ciphertext.clone(),
-            message_key: message_key.clone(),
         };
 
         assert_eq!(result.ciphertext, ciphertext);
-        assert_eq!(result.message_key, message_key);
     }
 
     #[test]
@@ -1613,19 +1543,15 @@ mod native_tests {
     fn test_encryption_result_internal_data() {
         let result = EncryptionResult {
             ciphertext: vec![5u8; 64],
-            message_key: vec![6u8; 32],
         };
 
         // Test internal data
         assert_eq!(result.ciphertext, vec![5u8; 64]);
-        assert_eq!(result.message_key, vec![6u8; 32]);
         assert_eq!(result.ciphertext.len(), 64);
-        assert_eq!(result.message_key.len(), 32);
 
         // Test clone
         let cloned = result.clone();
         assert_eq!(cloned.ciphertext, result.ciphertext);
-        assert_eq!(cloned.message_key, result.message_key);
 
         // Test debug formatting
         let debug_str = format!("{:?}", result);
@@ -1668,12 +1594,8 @@ mod native_tests {
         assert_eq!(empty_x3dh.shared_secret.len(), 0);
         assert_eq!(empty_x3dh.associated_data.len(), 0);
 
-        let empty_encryption = EncryptionResult {
-            ciphertext: vec![],
-            message_key: vec![],
-        };
+        let empty_encryption = EncryptionResult { ciphertext: vec![] };
         assert_eq!(empty_encryption.ciphertext.len(), 0);
-        assert_eq!(empty_encryption.message_key.len(), 0);
     }
 
     // Test large data structures
@@ -1692,42 +1614,50 @@ mod native_tests {
     // ========== Double Ratchet Tests ==========
 
     #[test]
-    fn test_initialize_double_ratchet_internal_initiator() {
-        let shared_secret = vec![1u8; 32];
-        let state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+    fn test_initialize_double_ratchet_initiator() {
+        let shared_secret = [1u8; 32];
+        let (alice, bob, _) = test_ratchet_pair(&shared_secret, ratchet_ad()).unwrap();
 
-        assert_eq!(state.root_key, shared_secret);
-        assert!(state.sending_chain_key.is_some());
-        assert!(state.sending_dh_keypair.is_some());
-        assert_eq!(state.sending_message_number, 0);
-        assert_eq!(state.receiving_message_number, 0);
-        assert_eq!(state.previous_chain_length, 0);
+        assert_ne!(alice.root_key, shared_secret.to_vec());
+        assert!(alice.sending_chain_key.is_some());
+        assert!(alice.sending_dh_keypair.is_some());
+        assert_eq!(alice.sending_message_number, 0);
+        assert_eq!(alice.receiving_message_number, 0);
+        assert_eq!(alice.previous_chain_length, 0);
+        assert_eq!(alice.associated_data, ratchet_ad());
+        // Bob retained for pairing sanity
+        assert_eq!(bob.root_key, shared_secret.to_vec());
     }
 
     #[test]
-    fn test_initialize_double_ratchet_internal_responder() {
-        let shared_secret = vec![1u8; 32];
-        let state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+    fn test_initialize_double_ratchet_responder() {
+        let shared_secret = [1u8; 32];
+        let (_, bob, _) = test_ratchet_pair(&shared_secret, ratchet_ad()).unwrap();
 
-        assert_eq!(state.root_key, shared_secret);
-        assert!(state.sending_chain_key.is_none());
-        assert!(state.sending_dh_keypair.is_none());
-        assert_eq!(state.receiving_message_number, 0);
-        assert_eq!(state.previous_chain_length, 0);
+        assert_eq!(bob.root_key, shared_secret.to_vec());
+        assert!(bob.sending_chain_key.is_none());
+        assert!(bob.sending_dh_keypair.is_some()); // seeded with local SPK
+        assert_eq!(bob.receiving_message_number, 0);
+        assert_eq!(bob.previous_chain_length, 0);
+        assert_eq!(bob.associated_data, ratchet_ad());
     }
 
     #[test]
-    fn test_initialize_double_ratchet_internal_invalid_secret() {
-        let short_secret = vec![1u8; 16];
-        let result = initialize_double_ratchet_internal(&short_secret, true);
+    fn test_initialize_double_ratchet_invalid_secret() {
+        let short_secret = [1u8; 16];
+        let result = test_ratchet_pair(&short_secret, ratchet_ad());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_initialize_double_ratchet_empty_ad() {
+        let result = test_ratchet_pair(&[1u8; 32], b"");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_double_ratchet_encrypt_decrypt_roundtrip() {
-        let shared_secret = vec![1u8; 32];
-        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = ratchet_pair();
 
         let plaintext = b"Hello, Double Ratchet!";
         let encrypted = double_ratchet_encrypt_internal(&mut alice_state, plaintext).unwrap();
@@ -1742,9 +1672,7 @@ mod native_tests {
 
     #[test]
     fn test_double_ratchet_multiple_messages() {
-        let shared_secret = vec![1u8; 32];
-        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = ratchet_pair();
 
         let msg1 = b"Message 1";
         let msg2 = b"Message 2";
@@ -1772,56 +1700,45 @@ mod native_tests {
 
     #[test]
     fn test_double_ratchet_bidirectional() {
-        let shared_secret = vec![1u8; 32];
-        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = ratchet_pair();
 
-        // Alice -> Bob
         let msg1 = double_ratchet_encrypt_internal(&mut alice_state, b"Alice to Bob").unwrap();
         let _dec1 = double_ratchet_decrypt_internal(&mut bob_state, &msg1).unwrap();
 
-        // Bob -> Alice
         let msg2 = double_ratchet_encrypt_internal(&mut bob_state, b"Bob to Alice").unwrap();
         let _dec2 = double_ratchet_decrypt_internal(&mut alice_state, &msg2).unwrap();
 
-        // Alice -> Bob again
         let msg3 =
             double_ratchet_encrypt_internal(&mut alice_state, b"Alice to Bob again").unwrap();
         let dec3 = double_ratchet_decrypt_internal(&mut bob_state, &msg3).unwrap();
         assert_eq!(dec3, b"Alice to Bob again");
     }
 
-    // Signal Double Ratchet root_key invariants (native regression).
-    //
-    // Per the spec, DHRatchet() performs TWO KDF_RK calls per receive:
-    //   state.RK, state.CKr = KDF_RK(state.RK, DH(state.DHs, state.DHr))
-    //   state.DHs = GENERATE_DH()
-    //   state.RK, state.CKs = KDF_RK(state.RK, DH(state.DHs, state.DHr))
-    // so the receiver always ends one DH-ratchet step ahead of the peer.
-    // A prior browser test incorrectly asserted root_key equality after a
-    // ping-pong, which is mathematically impossible for a correct DR.
-    // These native tests guard that the core semantics stay spec-compliant.
+    // SP-2026 secure init + Signal Double Ratchet root_key invariants.
     #[test]
     fn test_double_ratchet_root_key_invariants_after_init() {
-        let shared_secret = vec![1u8; 32];
-        let alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
-        let bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let shared_secret = [1u8; 32];
+        let (alice_state, bob_state, _) = test_ratchet_pair(&shared_secret, ratchet_ad()).unwrap();
 
-        assert_eq!(
-            alice_state.root_key, bob_state.root_key,
-            "roots must match at init"
+        assert_ne!(
+            alice_state.root_key,
+            shared_secret.to_vec(),
+            "Alice's root is DH-derived, not equal to shared_secret"
         );
         assert_eq!(
-            alice_state.root_key,
-            vec![1u8; 32],
-            "initial root equals shared_secret"
+            bob_state.root_key,
+            shared_secret.to_vec(),
+            "Bob's root equals shared_secret until first receive"
+        );
+        assert_ne!(
+            alice_state.root_key, bob_state.root_key,
+            "Alice and Bob roots may differ at init"
         );
     }
 
     #[test]
     fn test_double_ratchet_send_does_not_advance_root_key() {
-        let shared_secret = vec![1u8; 32];
-        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let (mut alice_state, _) = ratchet_pair();
         let before = alice_state.root_key.clone();
         let _enc = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
         let after = alice_state.root_key.clone();
@@ -1830,30 +1747,28 @@ mod native_tests {
 
     #[test]
     fn test_double_ratchet_root_advances_on_receive() {
-        let shared_secret = vec![1u8; 32];
-        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
-        let initial_root = alice_state.root_key.clone();
+        let (mut alice_state, mut bob_state) = ratchet_pair();
+        let alice_root_at_init = alice_state.root_key.clone();
+        let bob_root_at_init = bob_state.root_key.clone();
 
         let enc1 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
         let _ = double_ratchet_decrypt_internal(&mut bob_state, &enc1).unwrap();
 
         assert_ne!(
-            bob_state.root_key, initial_root,
+            bob_state.root_key, bob_root_at_init,
             "Bob's root must advance on first DH ratchet"
         );
         assert_eq!(
-            alice_state.root_key, initial_root,
+            alice_state.root_key, alice_root_at_init,
             "Alice's root unchanged until she receives"
         );
     }
 
     #[test]
     fn test_double_ratchet_roots_diverge_after_pingpong() {
-        let shared_secret = vec![1u8; 32];
-        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
-        let initial_root = alice_state.root_key.clone();
+        let (mut alice_state, mut bob_state) = ratchet_pair();
+        let alice_root_at_init = alice_state.root_key.clone();
+        let bob_root_at_init = bob_state.root_key.clone();
 
         let enc1 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
         let _ = double_ratchet_decrypt_internal(&mut bob_state, &enc1).unwrap();
@@ -1861,11 +1776,11 @@ mod native_tests {
         let _ = double_ratchet_decrypt_internal(&mut alice_state, &enc2).unwrap();
 
         assert_ne!(
-            alice_state.root_key, initial_root,
+            alice_state.root_key, alice_root_at_init,
             "Alice's root advances after receiving"
         );
         assert_ne!(
-            bob_state.root_key, initial_root,
+            bob_state.root_key, bob_root_at_init,
             "Bob's root advances after receiving"
         );
         assert_ne!(
@@ -1876,9 +1791,7 @@ mod native_tests {
 
     #[test]
     fn test_double_ratchet_works_after_root_key_divergence() {
-        let shared_secret = vec![1u8; 32];
-        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = ratchet_pair();
 
         let enc1 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
         let dec1 = double_ratchet_decrypt_internal(&mut bob_state, &enc1).unwrap();
@@ -1888,7 +1801,6 @@ mod native_tests {
         let dec2 = double_ratchet_decrypt_internal(&mut alice_state, &enc2).unwrap();
         assert_eq!(dec2, b"Message 2");
 
-        // Roots have diverged now; protocol must keep functioning.
         let enc3 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 3").unwrap();
         let dec3 = double_ratchet_decrypt_internal(&mut bob_state, &enc3).unwrap();
         assert_eq!(dec3, b"Message 3");
@@ -1909,8 +1821,7 @@ mod native_tests {
 
     #[test]
     fn test_double_ratchet_decrypt_short_ciphertext() {
-        let shared_secret = vec![1u8; 32];
-        let mut state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let (_, mut state) = ratchet_pair();
 
         let message = DoubleRatchetMessage {
             ciphertext: vec![1u8; 10], // Too short
@@ -1925,8 +1836,7 @@ mod native_tests {
 
     #[test]
     fn test_perform_dh_ratchet_step_first_message() {
-        let shared_secret = vec![1u8; 32];
-        let mut state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let (_, mut state) = ratchet_pair();
 
         let alice_keypair = generate_x25519_keypair_internal();
         perform_dh_ratchet_step(&mut state, &alice_keypair.public_key).unwrap();
@@ -1940,14 +1850,11 @@ mod native_tests {
 
     #[test]
     fn test_perform_dh_ratchet_step_normal_ratchet() {
-        let shared_secret = vec![1u8; 32];
-        let mut state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let (mut state, _) = ratchet_pair();
 
-        // First establish receiving chain
         let bob_keypair1 = generate_x25519_keypair_internal();
         perform_dh_ratchet_step(&mut state, &bob_keypair1.public_key).unwrap();
 
-        // Then perform another ratchet step
         let bob_keypair2 = generate_x25519_keypair_internal();
         perform_dh_ratchet_step(&mut state, &bob_keypair2.public_key).unwrap();
 
@@ -1957,14 +1864,11 @@ mod native_tests {
 
     #[test]
     fn test_skip_message_keys() {
-        let shared_secret = vec![1u8; 32];
-        let mut state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let (mut state, _) = ratchet_pair();
 
-        // Establish receiving chain
         let remote_keypair = generate_x25519_keypair_internal();
         perform_dh_ratchet_step(&mut state, &remote_keypair.public_key).unwrap();
 
-        // Skip to message 5
         skip_message_keys(&mut state, 5).unwrap();
 
         assert_eq!(state.receiving_message_number, 5);
@@ -1973,13 +1877,11 @@ mod native_tests {
 
     #[test]
     fn test_skip_message_keys_too_many() {
-        let shared_secret = vec![1u8; 32];
-        let mut state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let (mut state, _) = ratchet_pair();
 
         let remote_keypair = generate_x25519_keypair_internal();
         perform_dh_ratchet_step(&mut state, &remote_keypair.public_key).unwrap();
 
-        // Try to skip more than MAX_SKIPPED_MESSAGE_KEYS
         let result = skip_message_keys(&mut state, 2000);
         assert!(result.is_err());
     }
@@ -1989,22 +1891,18 @@ mod native_tests {
         let mut state = DoubleRatchetState::new();
         state.root_key = vec![1u8; 32];
 
-        // Should succeed but do nothing if no receiving chain key
         skip_message_keys(&mut state, 5).unwrap();
         assert_eq!(state.skipped_message_keys.len(), 0);
     }
 
     #[test]
     fn test_out_of_order_messages() {
-        let shared_secret = vec![1u8; 32];
-        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = ratchet_pair();
 
         let msg1 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
         let msg2 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 2").unwrap();
         let msg3 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 3").unwrap();
 
-        // Receive out of order: 3, 1, 2
         assert_eq!(
             double_ratchet_decrypt_internal(&mut bob_state, &msg3).unwrap(),
             b"Message 3"
@@ -2023,17 +1921,14 @@ mod native_tests {
 
     #[test]
     fn test_cleanup_skipped_message_keys() {
-        let shared_secret = vec![1u8; 32];
-        let mut state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
+        let (mut state, _) = ratchet_pair();
 
         let remote_keypair = generate_x25519_keypair_internal();
         perform_dh_ratchet_step(&mut state, &remote_keypair.public_key).unwrap();
 
-        // Create many skipped keys
         skip_message_keys(&mut state, 10).unwrap();
         assert_eq!(state.skipped_message_keys.len(), 10);
 
-        // Cleanup to 5 keys
         let removed = cleanup_skipped_message_keys_internal(&mut state, 5);
         assert_eq!(removed, 5);
         assert_eq!(state.skipped_message_keys.len(), 5);
@@ -2056,14 +1951,11 @@ mod native_tests {
 
     #[test]
     fn test_double_ratchet_message_number_mismatch() {
-        let shared_secret = vec![1u8; 32];
-        let mut alice_state = initialize_double_ratchet_internal(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet_internal(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = ratchet_pair();
 
         let msg1 = double_ratchet_encrypt_internal(&mut alice_state, b"Message 1").unwrap();
         let _dec1 = double_ratchet_decrypt_internal(&mut bob_state, &msg1).unwrap();
 
-        // Try to decrypt message 0 again (should fail)
         let result = double_ratchet_decrypt_internal(&mut bob_state, &msg1);
         assert!(result.is_err());
     }
@@ -2110,15 +2002,12 @@ mod native_tests {
     fn test_encryption_result_struct() {
         let result = EncryptionResult {
             ciphertext: vec![1u8; 64],
-            message_key: vec![2u8; 32],
         };
 
         assert_eq!(result.ciphertext.len(), 64);
-        assert_eq!(result.message_key.len(), 32);
 
         let cloned = result.clone();
         assert_eq!(cloned.ciphertext, result.ciphertext);
-        assert_eq!(cloned.message_key, result.message_key);
 
         let debug_str = format!("{:?}", result);
         assert!(debug_str.contains("EncryptionResult"));
@@ -2242,27 +2131,29 @@ mod native_tests {
         let bob_identity = generate_x25519_keypair_internal();
         let bob_signed_prekey = generate_x25519_keypair_internal();
         let bob_one_time_prekey = generate_x25519_keypair_internal();
+        let bob_spk_sig = signal_protocol_core::sign_prekey(
+            &bob_identity.private_key,
+            &bob_signed_prekey.public_key,
+        )
+        .unwrap();
 
         let result = x3dh_initiate_internal(
             &alice_identity.private_key,
             &alice_ephemeral.private_key,
+            &alice_identity.public_key,
             &bob_identity.public_key,
             &bob_signed_prekey.public_key,
+            &bob_spk_sig,
             Some(&bob_one_time_prekey.public_key),
         );
         assert!(result.is_ok());
 
-        // Test messages::log indirectly through encryption
-        use super::super::messages::encrypt_message_internal;
-        let shared_secret = vec![1u8; 32];
-        let plaintext = b"test message";
-        let result = encrypt_message_internal(&shared_secret, plaintext, 1);
-        assert!(result.is_ok());
-
         // Test double_ratchet::log indirectly through double ratchet functions
-        use super::super::double_ratchet::initialize_double_ratchet_internal;
-        let state = initialize_double_ratchet_internal(&shared_secret, true);
-        assert!(state.is_ok());
+        let shared_secret = [1u8; 32];
+        let (mut alice, mut bob, _) = test_ratchet_pair(&shared_secret, ratchet_ad()).unwrap();
+        let enc = double_ratchet_encrypt_internal(&mut alice, b"test message").unwrap();
+        let dec = double_ratchet_decrypt_internal(&mut bob, &enc).unwrap();
+        assert_eq!(dec, b"test message");
     }
 
     // ========== Lib.rs Tests ==========

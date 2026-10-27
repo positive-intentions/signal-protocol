@@ -67,7 +67,14 @@ export function sign_data(private_key: Uint8Array, data: Uint8Array): Uint8Array
  * - Returns error if key format is invalid
  */
 export function verify_signature(public_key: Uint8Array, signature: Uint8Array, data: Uint8Array): boolean;
-export function initialize_double_ratchet(shared_secret: Uint8Array, is_initiator: boolean): DoubleRatchetState;
+/**
+ * Initiator session: first chain DH against Bob's SPK (SP-2026-012).
+ */
+export function initialize_double_ratchet_initiator(shared_secret: Uint8Array, associated_data: Uint8Array, remote_spk_public: Uint8Array): DoubleRatchetState;
+/**
+ * Responder session: seed local SPK so Alice's first message matches (SP-2026-012).
+ */
+export function initialize_double_ratchet_responder(shared_secret: Uint8Array, associated_data: Uint8Array, local_spk_public: Uint8Array, local_spk_private: Uint8Array): DoubleRatchetState;
 export function double_ratchet_encrypt(state: DoubleRatchetState, plaintext: Uint8Array): DoubleRatchetMessage;
 export function double_ratchet_decrypt(state: DoubleRatchetState, message: DoubleRatchetMessage): Uint8Array;
 export function cleanup_skipped_message_keys(state: DoubleRatchetState, max_keys: number): number;
@@ -166,95 +173,13 @@ export function generate_one_time_prekey(): KeyPair;
  */
 export function generate_ephemeral_keypair(): KeyPair;
 /**
- * Encrypt a message using Signal Protocol message encryption
- *
- * This function implements the Signal Protocol's message encryption scheme,
- * which provides forward secrecy by deriving a unique key for each message.
- * The encryption uses AES-GCM for authenticated encryption, ensuring both
- * confidentiality and integrity.
- *
- * ## Forward Secrecy Implementation
- * Each message is encrypted with a unique key derived from:
- * - The shared secret from X3DH key exchange
- * - A message-specific counter/number
- * - Cryptographic salt and info strings
- *
- * This ensures that compromise of one message key doesn't affect other messages.
- *
- * ## Encryption Process
- * 1. Derive message-specific key using HKDF
- * 2. Generate random 96-bit nonce for AES-GCM
- * 3. Encrypt plaintext with derived key and nonce
- * 4. Prepend nonce to ciphertext for transmission
- *
- * ## Security Properties
- * - **Confidentiality**: AES-256-GCM encryption
- * - **Integrity**: Built-in authentication tag
- * - **Forward Secrecy**: Unique key per message
- * - **Replay Protection**: Message numbering
- *
- * ## Parameters
- * - `shared_secret`: The shared secret from X3DH key exchange (32 bytes)
- * - `plaintext`: The message to encrypt
- * - `message_number`: Sequential message counter for forward secrecy
- *
- * ## Returns
- * An `EncryptionResult` containing:
- * - `ciphertext`: Nonce + encrypted data + auth tag
- * - `message_key`: The derived key for this specific message
- *
- * ## Example Usage
- * ```javascript
- * const result = encrypt_message(sharedSecret, plaintext, messageNumber);
- * const encryptedData = result.ciphertext();
- * const messageKey = result.message_key();
- * ```
+ * Sign a signed-prekey public key with the identity private key (XEdDSA).
  */
-export function encrypt_message(shared_secret: Uint8Array, plaintext: Uint8Array, message_number: number): EncryptionResult;
+export function sign_prekey(identity_private: Uint8Array, signed_prekey_public: Uint8Array): Uint8Array;
 /**
- * Decrypt a message using Signal Protocol message decryption
- *
- * This function decrypts messages that were encrypted using the Signal Protocol's
- * message encryption scheme. It uses the provided message key and extracts the
- * nonce from the ciphertext to perform AES-GCM decryption.
- *
- * ## Decryption Process
- * 1. Extract 96-bit nonce from the beginning of ciphertext
- * 2. Use provided message key for AES-GCM decryption
- * 3. Verify authentication tag during decryption
- * 4. Return decrypted plaintext
- *
- * ## Security Verification
- * - Authentication tag verification ensures message integrity
- * - Nonce uniqueness prevents replay attacks
- * - Key verification ensures authorized decryption
- *
- * ## Parameters
- * - `shared_secret`: The original shared secret (for validation/logging)
- * - `ciphertext`: The encrypted message with prepended nonce
- * - `message_key`: The derived key for this specific message
- * - `message_number`: The message counter (for logging/validation)
- *
- * ## Returns
- * A `Uint8Array` containing the decrypted plaintext message
- *
- * ## Errors
- * - Returns error if ciphertext is too short (< 12 bytes for nonce)
- * - Returns error if AES-GCM decryption fails (wrong key, corrupted data, etc.)
- * - Returns error if authentication tag verification fails
- *
- * ## Example Usage
- * ```javascript
- * const plaintext = decrypt_message(
- *     sharedSecret,
- *     encryptedData,
- *     messageKey,
- *     messageNumber
- * );
- * const message = new TextDecoder().decode(plaintext);
- * ```
+ * Verify a signed-prekey signature with the identity public key (XEdDSA).
  */
-export function decrypt_message(shared_secret: Uint8Array, ciphertext: Uint8Array, message_key: Uint8Array, message_number: number): Uint8Array;
+export function verify_signed_prekey(identity_public: Uint8Array, signed_prekey_public: Uint8Array, signature: Uint8Array): void;
 /**
  * Serialize a public key for transmission or storage
  *
@@ -425,93 +350,8 @@ export function free_keypair(_keypair: KeyPair): void;
  * ```
  */
 export function free_buffer(_buffer: Uint8Array): void;
-/**
- * Initiate X3DH key exchange (Alice's side)
- *
- * This function performs the X3DH key agreement from the initiator's perspective.
- * Alice combines her keys with Bob's prekeys to compute a shared secret that
- * both parties can independently derive.
- *
- * ## X3DH Protocol Overview
- * The X3DH protocol performs multiple Diffie-Hellman computations:
- * 1. DH1: Alice_Identity_Private × Bob_SignedPrekey_Public
- * 2. DH2: Alice_Ephemeral_Private × Bob_Identity_Public  
- * 3. DH3: Alice_Ephemeral_Private × Bob_SignedPrekey_Public
- * 4. DH4: Alice_Ephemeral_Private × Bob_OneTimePrekey_Public (optional)
- *
- * The results are concatenated and fed into HKDF to derive the final shared secret.
- *
- * ## Security Properties
- * - **Forward Secrecy**: Compromise of long-term keys doesn't affect past sessions
- * - **Authentication**: Both parties prove their identity through key ownership
- * - **Asynchronous**: Bob doesn't need to be online during key exchange
- * - **Deniability**: No long-term proof of participation in conversations
- *
- * ## Parameters
- * - `alice_identity_private`: Alice's long-term identity private key (32 bytes)
- * - `alice_ephemeral_private`: Alice's session-specific ephemeral private key (32 bytes)
- * - `bob_identity_public`: Bob's identity public key (32 bytes)
- * - `bob_signed_prekey_public`: Bob's signed prekey public key (32 bytes)
- * - `bob_one_time_prekey_public`: Optional one-time prekey for additional forward secrecy
- *
- * ## Returns
- * An `X3DHResult` containing the shared secret and associated data
- *
- * ## Example Usage
- * ```rust
- * let result = x3dh_initiate(
- *     &alice_identity_private,
- *     &alice_ephemeral_private,
- *     &bob_identity_public,
- *     &bob_signed_prekey_public,
- *     Some(bob_one_time_prekey_public)
- * )?;
- * let shared_secret = result.shared_secret();
- * ```
- */
-export function x3dh_initiate(alice_identity_private: Uint8Array, alice_ephemeral_private: Uint8Array, bob_identity_public: Uint8Array, bob_signed_prekey_public: Uint8Array, bob_one_time_prekey_public?: Uint8Array | null): X3DHResult;
-/**
- * Respond to X3DH key exchange (Bob's side)
- *
- * This function performs the X3DH key agreement from the responder's perspective.
- * Bob uses his prekeys and Alice's ephemeral key to compute the same shared secret
- * that Alice derived on her side.
- *
- * ## Protocol Symmetry
- * Bob performs the exact same DH computations as Alice, but uses his private keys
- * instead of Alice's. The commutativity property of our simplified ECDH ensures
- * that both parties compute identical shared secrets.
- *
- * ## Key Derivation Order
- * Bob must perform the DH computations in the same order as Alice:
- * 1. DH1: Bob_SignedPrekey_Private × Alice_Identity_Public (= Alice's DH1)
- * 2. DH2: Bob_Identity_Private × Alice_Ephemeral_Public (= Alice's DH2)
- * 3. DH3: Bob_SignedPrekey_Private × Alice_Ephemeral_Public (= Alice's DH3)
- * 4. DH4: Bob_OneTimePrekey_Private × Alice_Ephemeral_Public (= Alice's DH4, optional)
- *
- * ## Parameters
- * - `bob_identity_private`: Bob's long-term identity private key (32 bytes)
- * - `bob_signed_prekey_private`: Bob's signed prekey private key (32 bytes)
- * - `bob_one_time_prekey_private`: Optional one-time prekey private key (32 bytes)
- * - `alice_identity_public`: Alice's identity public key (32 bytes)
- * - `alice_ephemeral_public`: Alice's ephemeral public key from the key exchange (32 bytes)
- *
- * ## Returns
- * An `X3DHResult` containing the same shared secret Alice computed
- *
- * ## Example Usage
- * ```rust
- * let result = x3dh_respond(
- *     &bob_identity_private,
- *     &bob_signed_prekey_private,
- *     Some(bob_one_time_prekey_private),
- *     &alice_identity_public,
- *     &alice_ephemeral_public
- * )?;
- * let shared_secret = result.shared_secret();
- * ```
- */
-export function x3dh_respond(bob_identity_private: Uint8Array, bob_signed_prekey_private: Uint8Array, bob_one_time_prekey_private: Uint8Array | null | undefined, alice_identity_public: Uint8Array, alice_ephemeral_public: Uint8Array): X3DHResult;
+export function x3dh_initiate(alice_identity_private: Uint8Array, alice_ephemeral_private: Uint8Array, alice_identity_public: Uint8Array, bob_identity_public: Uint8Array, bob_signed_prekey_public: Uint8Array, bob_signed_prekey_signature: Uint8Array, bob_one_time_prekey_public?: Uint8Array | null): X3DHResult;
+export function x3dh_respond(bob_identity_private: Uint8Array, bob_signed_prekey_private: Uint8Array, bob_one_time_prekey_private: Uint8Array | null | undefined, bob_identity_public: Uint8Array, alice_identity_public: Uint8Array, alice_ephemeral_public: Uint8Array): X3DHResult;
 /**
  * Initialize the WASM module
  *
@@ -556,13 +396,6 @@ export class EncryptionResult {
    * making it self-contained for transmission and storage.
    */
   readonly ciphertext: Uint8Array;
-  /**
-   * Get the message key as a JavaScript Uint8Array
-   *
-   * This key is required for decryption and should be stored
-   * securely alongside the ciphertext if needed for later access.
-   */
-  readonly message_key: Uint8Array;
 }
 /**
  * Cryptographic key pair structure
@@ -640,7 +473,8 @@ export interface InitOutput {
   readonly doubleratchetmessage_dh_public_key: (a: number) => any;
   readonly doubleratchetmessage_message_number: (a: number) => number;
   readonly doubleratchetmessage_previous_chain_length: (a: number) => number;
-  readonly initialize_double_ratchet: (a: any, b: number) => [number, number, number];
+  readonly initialize_double_ratchet_initiator: (a: any, b: any, c: any) => [number, number, number];
+  readonly initialize_double_ratchet_responder: (a: any, b: any, c: any, d: any) => [number, number, number];
   readonly double_ratchet_encrypt: (a: number, b: any) => [number, number, number];
   readonly double_ratchet_decrypt: (a: number, b: number) => [number, number, number];
   readonly cleanup_skipped_message_keys: (a: number, b: number) => number;
@@ -648,25 +482,24 @@ export interface InitOutput {
   readonly generate_signed_prekey: () => [number, number, number];
   readonly generate_one_time_prekey: () => [number, number, number];
   readonly generate_ephemeral_keypair: () => [number, number, number];
-  readonly encrypt_message: (a: any, b: any, c: number) => [number, number, number];
-  readonly decrypt_message: (a: any, b: any, c: any, d: number) => [number, number, number];
+  readonly sign_prekey: (a: any, b: any) => [number, number, number];
+  readonly verify_signed_prekey: (a: any, b: any, c: any) => [number, number];
+  readonly __wbg_keypair_free: (a: number, b: number) => void;
+  readonly keypair_public_key: (a: number) => any;
+  readonly keypair_private_key: (a: number) => any;
   readonly __wbg_encryptionresult_free: (a: number, b: number) => void;
   readonly encryptionresult_ciphertext: (a: number) => any;
-  readonly encryptionresult_message_key: (a: number) => any;
   readonly serialize_public_key: (a: any) => [number, number, number];
   readonly deserialize_public_key: (a: any) => [number, number, number];
   readonly hkdf_derive_key: (a: any, b: any, c: any, d: number) => [number, number, number];
   readonly free_keypair: (a: number) => void;
   readonly free_buffer: (a: any) => void;
-  readonly x3dh_initiate: (a: any, b: any, c: any, d: any, e: number) => [number, number, number];
-  readonly x3dh_respond: (a: any, b: any, c: number, d: any, e: any) => [number, number, number];
+  readonly x3dh_initiate: (a: any, b: any, c: any, d: any, e: any, f: any, g: number) => [number, number, number];
+  readonly x3dh_respond: (a: any, b: any, c: number, d: any, e: any, f: any) => [number, number, number];
   readonly main: () => void;
   readonly __wbg_x3dhresult_free: (a: number, b: number) => void;
-  readonly __wbg_keypair_free: (a: number, b: number) => void;
   readonly x3dhresult_associated_data: (a: number) => any;
   readonly x3dhresult_shared_secret: (a: number) => any;
-  readonly keypair_private_key: (a: number) => any;
-  readonly keypair_public_key: (a: number) => any;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __externref_table_alloc: () => number;
   readonly __wbindgen_export_2: WebAssembly.Table;

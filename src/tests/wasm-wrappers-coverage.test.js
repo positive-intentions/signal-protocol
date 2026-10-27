@@ -16,6 +16,23 @@ global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
 describe("WASM Wrapper Functions Coverage", () => {
+  function initRatchetPair(wasmModule, sharedSecret, ad) {
+    const adBytes =
+      ad || new TextEncoder().encode("IK_A||IK_B_test_ad______________");
+    const spk = wasmModule.generate_signed_prekey();
+    const alice = wasmModule.initialize_double_ratchet_initiator(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+    );
+    const bob = wasmModule.initialize_double_ratchet_responder(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+      spk.private_key,
+    );
+    return { alice, bob, spk, ad: adBytes };
+  }
   let wasmModule;
   let wasmAvailable = false;
 
@@ -221,12 +238,18 @@ describe("WASM Wrapper Functions Coverage", () => {
       const bobIdentity = wasmModule.generate_identity_keypair();
       const bobSignedPrekey = wasmModule.generate_signed_prekey();
       const bobOneTimePrekey = wasmModule.generate_one_time_prekey();
+      const bobSpkSig = wasmModule.sign_prekey(
+        bobIdentity.private_key,
+        bobSignedPrekey.public_key,
+      );
 
       const result = wasmModule.x3dh_initiate(
         aliceIdentity.private_key,
         aliceEphemeral.private_key,
+        aliceIdentity.public_key,
         bobIdentity.public_key,
         bobSignedPrekey.public_key,
+        bobSpkSig,
         bobOneTimePrekey.public_key,
       );
 
@@ -244,12 +267,18 @@ describe("WASM Wrapper Functions Coverage", () => {
       const aliceEphemeral = wasmModule.generate_ephemeral_keypair();
       const bobIdentity = wasmModule.generate_identity_keypair();
       const bobSignedPrekey = wasmModule.generate_signed_prekey();
+      const bobSpkSig = wasmModule.sign_prekey(
+        bobIdentity.private_key,
+        bobSignedPrekey.public_key,
+      );
 
       const result = wasmModule.x3dh_initiate(
         aliceIdentity.private_key,
         aliceEphemeral.private_key,
+        aliceIdentity.public_key,
         bobIdentity.public_key,
         bobSignedPrekey.public_key,
+        bobSpkSig,
         null,
       );
 
@@ -271,6 +300,7 @@ describe("WASM Wrapper Functions Coverage", () => {
         bobIdentity.private_key,
         bobSignedPrekey.private_key,
         bobOneTimePrekey.private_key,
+        bobIdentity.public_key,
         aliceIdentity.public_key,
         aliceEphemeral.public_key,
       );
@@ -292,6 +322,7 @@ describe("WASM Wrapper Functions Coverage", () => {
         bobIdentity.private_key,
         bobSignedPrekey.private_key,
         null,
+        bobIdentity.public_key,
         aliceIdentity.public_key,
         aliceEphemeral.public_key,
       );
@@ -308,12 +339,18 @@ describe("WASM Wrapper Functions Coverage", () => {
       const aliceEphemeral = wasmModule.generate_ephemeral_keypair();
       const bobIdentity = wasmModule.generate_identity_keypair();
       const bobSignedPrekey = wasmModule.generate_signed_prekey();
+      const bobSpkSig = wasmModule.sign_prekey(
+        bobIdentity.private_key,
+        bobSignedPrekey.public_key,
+      );
 
       const result = wasmModule.x3dh_initiate(
         aliceIdentity.private_key,
         aliceEphemeral.private_key,
+        aliceIdentity.public_key,
         bobIdentity.public_key,
         bobSignedPrekey.public_key,
+        bobSpkSig,
         null,
       );
 
@@ -327,68 +364,12 @@ describe("WASM Wrapper Functions Coverage", () => {
     });
   });
 
-  describe("Message Encryption Wrappers", () => {
-    test("encrypt_message wrapper", () => {
+  describe("EncryptionResult type", () => {
+    test("EncryptionResult class is exported (SP-2026-016: no legacy encrypt/decrypt)", () => {
       expect(wasmAvailable).toBe(true);
-
-      const sharedSecret = new Uint8Array(32).fill(1);
-      const plaintext = new TextEncoder().encode("Secret message");
-      const messageNumber = 1;
-
-      const result = wasmModule.encrypt_message(
-        sharedSecret,
-        plaintext,
-        messageNumber,
-      );
-
-      expect(result).toBeDefined();
-      expect(result.ciphertext).toBeDefined();
-      expect(result.message_key).toBeDefined();
-      expect(result.ciphertext).toBeInstanceOf(Uint8Array);
-      expect(result.message_key).toBeInstanceOf(Uint8Array);
-      expect(result.ciphertext.length).toBeGreaterThan(plaintext.length);
-      expect(result.message_key.length).toBe(32);
-    });
-
-    test("decrypt_message wrapper", () => {
-      expect(wasmAvailable).toBe(true);
-
-      const sharedSecret = new Uint8Array(32).fill(1);
-      const plaintext = new TextEncoder().encode("Test message");
-      const messageNumber = 1;
-
-      // Encrypt first
-      const encrypted = wasmModule.encrypt_message(
-        sharedSecret,
-        plaintext,
-        messageNumber,
-      );
-
-      // Decrypt
-      const decrypted = wasmModule.decrypt_message(
-        sharedSecret,
-        encrypted.ciphertext,
-        encrypted.message_key,
-      );
-
-      expect(decrypted).toBeDefined();
-      expect(decrypted).toBeInstanceOf(Uint8Array);
-      expect(toArray(decrypted)).toEqual(toArray(plaintext));
-    });
-
-    test("EncryptionResult getters", () => {
-      expect(wasmAvailable).toBe(true);
-
-      const sharedSecret = new Uint8Array(32).fill(1);
-      const plaintext = new TextEncoder().encode("Test");
-      const result = wasmModule.encrypt_message(sharedSecret, plaintext, 1);
-
-      // Test getters
-      const ciphertext = result.ciphertext;
-      const messageKey = result.message_key;
-
-      expect(ciphertext).toBeInstanceOf(Uint8Array);
-      expect(messageKey).toBeInstanceOf(Uint8Array);
+      expect(wasmModule.EncryptionResult).toBeDefined();
+      expect(wasmModule.encrypt_message).toBeUndefined();
+      expect(wasmModule.decrypt_message).toBeUndefined();
     });
   });
 
@@ -518,7 +499,7 @@ describe("WASM Wrapper Functions Coverage", () => {
       expect(wasmAvailable).toBe(true);
 
       const sharedSecret = new Uint8Array(32).fill(1);
-      const state = wasmModule.initialize_double_ratchet(sharedSecret, true);
+      const state = initRatchetPair(wasmModule, sharedSecret).alice;
 
       expect(state).toBeDefined();
       expect(state.root_key).toBeDefined();
@@ -530,7 +511,7 @@ describe("WASM Wrapper Functions Coverage", () => {
       expect(wasmAvailable).toBe(true);
 
       const sharedSecret = new Uint8Array(32).fill(1);
-      const state = wasmModule.initialize_double_ratchet(sharedSecret, false);
+      const state = initRatchetPair(wasmModule, sharedSecret).bob;
 
       expect(state).toBeDefined();
       expect(state.root_key).toBeDefined();
@@ -541,10 +522,7 @@ describe("WASM Wrapper Functions Coverage", () => {
       expect(wasmAvailable).toBe(true);
 
       const sharedSecret = new Uint8Array(32).fill(1);
-      const aliceState = wasmModule.initialize_double_ratchet(
-        sharedSecret,
-        true,
-      );
+      const aliceState = initRatchetPair(wasmModule, sharedSecret).alice;
       const plaintext = new TextEncoder().encode("Hello, Double Ratchet!");
 
       const message = wasmModule.double_ratchet_encrypt(aliceState, plaintext);
@@ -563,13 +541,9 @@ describe("WASM Wrapper Functions Coverage", () => {
       expect(wasmAvailable).toBe(true);
 
       const sharedSecret = new Uint8Array(32).fill(1);
-      const aliceState = wasmModule.initialize_double_ratchet(
+      const { alice: aliceState, bob: bobState } = initRatchetPair(
+        wasmModule,
         sharedSecret,
-        true,
-      );
-      const bobState = wasmModule.initialize_double_ratchet(
-        sharedSecret,
-        false,
       );
 
       const plaintext = new TextEncoder().encode("Test message");
@@ -589,7 +563,7 @@ describe("WASM Wrapper Functions Coverage", () => {
       expect(wasmAvailable).toBe(true);
 
       const sharedSecret = new Uint8Array(32).fill(1);
-      const state = wasmModule.initialize_double_ratchet(sharedSecret, true);
+      const state = initRatchetPair(wasmModule, sharedSecret).alice;
 
       // Test getters
       const rootKey = state.root_key;
@@ -607,7 +581,7 @@ describe("WASM Wrapper Functions Coverage", () => {
       expect(wasmAvailable).toBe(true);
 
       const sharedSecret = new Uint8Array(32).fill(1);
-      const state = wasmModule.initialize_double_ratchet(sharedSecret, true);
+      const state = initRatchetPair(wasmModule, sharedSecret).alice;
       const plaintext = new TextEncoder().encode("Test");
       const message = wasmModule.double_ratchet_encrypt(state, plaintext);
 
@@ -627,7 +601,7 @@ describe("WASM Wrapper Functions Coverage", () => {
       expect(wasmAvailable).toBe(true);
 
       const sharedSecret = new Uint8Array(32).fill(1);
-      const state = wasmModule.initialize_double_ratchet(sharedSecret, true);
+      const state = initRatchetPair(wasmModule, sharedSecret).alice;
 
       // Create some skipped keys by encrypting multiple messages
       const plaintext = new TextEncoder().encode("Message");

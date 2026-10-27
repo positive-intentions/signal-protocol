@@ -1,9 +1,9 @@
 use dioxus::prelude::*;
 use signal_protocol_core::{
     double_ratchet_decrypt_internal, double_ratchet_encrypt_internal, generate_ephemeral_keypair,
-    generate_identity_keypair, generate_one_time_prekey, generate_signed_prekey,
-    initialize_double_ratchet_internal, x3dh_initiate_internal, x3dh_respond_internal,
-    DoubleRatchetState, X3DHResult,
+    generate_identity_keypair, generate_one_time_prekey, generate_signed_prekey, sign_prekey,
+    test_ratchet_pair, x3dh_initiate_internal, x3dh_respond_internal, DoubleRatchetState,
+    X3DHResult,
 };
 use whatsup_ui::gallery::KnobDef;
 
@@ -113,11 +113,23 @@ fn FullSessionDemo(alice_msg: String, bob_msg: String) -> Element {
                             let bob_id = generate_identity_keypair();
                             let bob_spk = generate_signed_prekey();
                             let bob_otpk = generate_one_time_prekey();
+                            let bob_spk_sig = match sign_prekey(
+                                &bob_id.private_key,
+                                &bob_spk.public_key,
+                            ) {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    status.set(StatusMsg::err(format!("sign SPK: {e}")));
+                                    return;
+                                }
+                            };
                             let alice_x3dh = match x3dh_initiate_internal(
                                 &alice_id.private_key,
                                 &alice_eph.private_key,
+                                &alice_id.public_key,
                                 &bob_id.public_key,
                                 &bob_spk.public_key,
+                                &bob_spk_sig,
                                 Some(&bob_otpk.public_key),
                             ) {
                                 Ok(r) => r,
@@ -130,6 +142,7 @@ fn FullSessionDemo(alice_msg: String, bob_msg: String) -> Element {
                                 &bob_id.private_key,
                                 &bob_spk.private_key,
                                 Some(&bob_otpk.private_key),
+                                &bob_id.public_key,
                                 &alice_id.public_key,
                                 &alice_eph.public_key,
                             ) {
@@ -162,21 +175,11 @@ fn FullSessionDemo(alice_msg: String, bob_msg: String) -> Element {
                                 status.set(StatusMsg::err("Run X3DH first."));
                                 return;
                             };
-                            let alice = match initialize_double_ratchet_internal(
+                            let (alice, bob, _) = match test_ratchet_pair(
                                 &x3dh.shared_secret,
-                                true,
+                                &x3dh.associated_data,
                             ) {
-                                Ok(s) => s,
-                                Err(e) => {
-                                    status.set(StatusMsg::err(e.to_string()));
-                                    return;
-                                }
-                            };
-                            let bob = match initialize_double_ratchet_internal(
-                                &x3dh.shared_secret,
-                                false,
-                            ) {
-                                Ok(s) => s,
+                                Ok(p) => p,
                                 Err(e) => {
                                     status.set(StatusMsg::err(e.to_string()));
                                     return;
@@ -188,7 +191,9 @@ fn FullSessionDemo(alice_msg: String, bob_msg: String) -> Element {
                                 from: "system",
                                 text: "Double Ratchet ready — messaging can begin".into(),
                             });
-                            teach.write().push("DR init (Alice initiator, Bob responder)".into());
+                            teach.write().push(
+                                "DR init via test_ratchet_pair (initiator + responder + AD)".into(),
+                            );
                             status.set(StatusMsg::ok("Ratchet initialized."));
                         }
                         2 | 4 => {

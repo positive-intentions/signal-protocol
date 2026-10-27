@@ -4,11 +4,11 @@
 <img src="signal.png" alt="App Logo" />
 </div>
 
-> **Warning:** This project has not been audited or security-reviewed. It is open source for transparency and educational purposes. Use at your own risk.
+> **Warning:** Research-grade, not an independent firm audit. [SP-2026](security/SP-2026-library-audit.md) findings are **mitigated** in-tree (commit-after-AEAD, PN skip, X3DH SPK verify, XEdDSA identity, IK-bound AD). **Hard break:** regenerate identities / re-pair after upgrade. Still not libsignal wire-compatible; use at your own risk.
 
 <div align="center">
   
-[Demo](https://signal.positive-intentions.com) | [Docs](https://positive-intentions.com/docs/technical/p2p-signal-protocol/) | [Audit](https://positive-intentions.com/docs/research/Security%20audit/signal-protocol-security-audit/) | [Formal Proof](https://positive-intentions.com/docs/technical/signal-protocol-formal-verification/) | [Reddit](https://www.reddit.com/r/positive_intentions) | <a rel="me" href="https://infosec.exchange/@xoron">Mastodon</a>
+[Demo](https://signal.positive-intentions.com) | [Docs](https://positive-intentions.com/docs/technical/cryptography/) | [Library audit](security/SP-2026-library-audit.md) | [Behavioural specs](specs/) | [Formal verification](https://positive-intentions.com/docs/technical/formal-verification/signal-protocol) | [Reddit](https://www.reddit.com/r/positive_intentions) | <a rel="me" href="https://infosec.exchange/@xoron">Mastodon</a>
 </div>
 
 <div align="center">
@@ -142,7 +142,7 @@ npm run test:wasm:node
 ### View Coverage
 
 **Rust (llvm-cov):** 100% line gate on `signal-protocol-core`. Workspace tests still run
-(including `src/rust/tests.rs`, which exercise core) but `src/` WASM sources are ignored
+(including `src/rust/tests.rs`, which exercise core) but WASM sources under `src/` are ignored
 so wrappers are not painted `coverage(off)`. `coverage(off)` is reserved for
 proven-unreachable helpers (for example HKDF expand of ≤64 bytes).
 WASM bindings are also exercised by Jest / wasm-pack.
@@ -203,15 +203,20 @@ const exchangeResult = await SignalWasmHelpers.performX3DHKeyExchange(
   wasmInstance,
 );
 
-// Initialize Double Ratchet
+// Initialize Double Ratchet (SP-2026: role + SPK + non-empty AD)
+// Use Bob's SPK from the X3DH bundle — do not generate a fresh SPK here.
 const wasmModule = await loadWasmModule();
-const aliceState = wasmModule.initialize_double_ratchet(
+const ad = exchangeResult.associatedData; // IK_A || IK_B from X3DH
+const aliceState = wasmModule.initialize_double_ratchet_initiator(
   exchangeResult.sharedSecret,
-  true, // isInitiator
+  ad,
+  bobBundle.signedPrekey,
 );
-const bobState = wasmModule.initialize_double_ratchet(
+const bobState = wasmModule.initialize_double_ratchet_responder(
   exchangeResult.sharedSecret,
-  false, // isInitiator
+  ad,
+  bob.signedPrekeyPair.publicKey,
+  bob.signedPrekeyPair.privateKey,
 );
 
 // Encrypt and decrypt messages

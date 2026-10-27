@@ -27,6 +27,6 @@ Networks reorder packets. The Double Ratchet stores **skipped message keys** so 
 
 | Step | Core API |
 |------|----------|
-| 1 | `initialize_double_ratchet_internal` |
+| 1 | `test_ratchet_pair` |
 | 2 | `double_ratchet_encrypt_internal` (×3) |
 | 3–4 | `double_ratchet_decrypt_internal` (skip-key path) |

@@ -28,6 +28,6 @@ No lasting session — each step is an isolated negative test with freshly gener
 |------|----------|
 | 1 | `validate_x25519_public_key` |
 | 2 | `x3dh_initiate_internal` |
-| 3 | `initialize_double_ratchet_internal` |
+| 3 | `initialize_double_ratchet` (RatchetRole) |
 | 4 | `double_ratchet_encrypt_internal` / `double_ratchet_decrypt_internal` |
 | 5 | `sign_data_internal` / `verify_signature_internal` |

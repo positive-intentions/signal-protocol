@@ -2,7 +2,7 @@
 
 This document shows what each ProVerif model proves and doesn't prove.
 
-**Library review (orthogonal):** In-house findings SP-2026-001–011 (authenticate-before-mutate, `PN` previous-chain skip, SPK verify in X3DH, etc.) are documented in [`security/SP-2026-library-audit.md`](../../security/SP-2026-library-audit.md) with runtime probes. These models do **not** encode those properties; a green ProVerif run does not clear them.
+**Library review (orthogonal):** In-house findings SP-2026-001–017 (authenticate-before-mutate, `PN` previous-chain skip, SPK verify in X3DH, XEdDSA, role init, wire v4 OTPK id, etc.) are documented in [`security/SP-2026-library-audit.md`](../../security/SP-2026-library-audit.md) with runtime probes. **SP-2026 hardening models were updated this pass** (`sp2026_hardening.pv` and related X3DH/DR models encode SPK check, IK-bound AD, commit-after-AEAD, and single-use OTPK). A green ProVerif run remains research-grade symbolic evidence — not a firm audit and not a claim that production refines the models.
 
 ## X3DH Models
 

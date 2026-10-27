@@ -1,94 +1,92 @@
 (******************************************************************
-  *                                                                *
-  *  X3DH Protocol - Complete PROVERIF Model                        *
-  *                                                                *
-  *  All 4 DH operations matching Rust implementation                *
-  *  HKDF with implementation constants                             *
-  *  Full security properties: authentication, forward secrecy,   *
-  *  post-compromise security                                     *
-  *                                                                *
-  *  From src/rust/x3dh.rs:43-56 (Alice's perspective):             *
-  *    DH1 = DH(Identity_Alice, SignedPreKey_Bob)                  *
-  *    DH2 = DH(Ephemeral_Alice, Identity_Bob)                     *
-  *    DH3 = DH(Ephemeral_Alice, SignedPreKey_Bob)                 *
-  *    DH4 = DH(Ephemeral_Alice, OneTimePreKey_Bob)                 *
-  *                                                                *
-  *  HKDF constants from docs/HKDF_CONSTANTS.md:                    *
-  *    Salt: "Signal_X3DH_Salt"                                    *
-  *    Info: "Signal_X3DH_Key_Derivation"                         *
-  *                                                                *
-  ******************************************************************)
+ * X3DH — SP-2026 hardening model
+ *
+ * - Single identity key used for both DH and XEdDSA signing
+ * - Initiator verifies SPK signature before deriving
+ * - Associated data = IK_A || IK_B
+ * - OTPK consumed at most once
+ * - Bob's identity known out-of-band
+ ******************************************************************)
 
-type key.
 type skey.
 type pkey.
 
-free c: channel [private].
+free c: channel.
 
-event secret_compromised(bitstring).
-event past_secret_secure(bitstring).
+fun pk(skey): pkey.
+fun pk_bytes(pkey): bitstring.
+fun sign(bitstring, skey): bitstring.
+fun checksign(bitstring, pkey, bitstring): bool
+reduc forall m: bitstring, k: skey; checksign(sign(m, k), pk(k), m) = true.
 
-fun dh(skey, bitstring): bitstring.
+fun dh(skey, pkey): bitstring.
+equation forall x: skey, y: skey; dh(x, pk(y)) = dh(y, pk(x)).
+
 fun concat(bitstring, bitstring): bitstring.
-fun hkdf_salt_x3dh(): bitstring.
-fun hkdf_info_x3dh(): bitstring.
-fun hkdf(bitstring, bitstring, bitstring): bitstring.
+fun hkdf(bitstring): bitstring.
+fun aead_enc(bitstring, bitstring, bitstring): bitstring.
+reduc forall k: bitstring, m: bitstring, ad: bitstring;
+  aead_dec(k, aead_enc(k, m, ad), ad) = m.
 
-event dh1_computed(bitstring).
-event dh2_computed(bitstring).
-event dh3_computed(bitstring).
-event dh4_computed(bitstring).
-event root_derived(bitstring).
-event alice_initiates.
-event bob_responds.
+event bob_signed_spk(pkey, bitstring).
+event alice_verified_spk(pkey, bitstring).
+event alice_completed(bitstring).
+event otpk_issued(bitstring).
+event otpk_used(bitstring).
+event message_sent(bitstring, bitstring, bitstring).
+event state_advanced(bitstring).
 
-free identity_a_priv: skey [private].
-free signed_prekey_b: bitstring [private].
-free ephemeral_a_priv: skey [private].
-free identity_b: bitstring [private].
-free one_time_prekey_b: bitstring [private].
-free sk: skey [private].
+free skA: skey [private].
+free skB: skey [private].
+free msg: bitstring [private].
 
-query attacker(sk).
+query attacker(msg).
 
-query x: bitstring; inj-event(dh1_computed(x)).
-query x: bitstring; inj-event(dh2_computed(x)).
-query x: bitstring; inj-event(dh3_computed(x)).
-query x: bitstring; inj-event(dh4_computed(x)).
+query spk: bitstring;
+  inj-event(alice_completed(spk)) ==> inj-event(bob_signed_spk(pk(skB), spk)).
 
-query x: bitstring; inj-event(alice_initiates) ==> inj-event(bob_responds).
+query m: bitstring, ad: bitstring, ct: bitstring;
+  inj-event(state_advanced(ct)) ==> inj-event(message_sent(m, ad, ct)).
 
-query x: bitstring; inj-event(dh1_computed(x)) ==> inj-event(bob_responds).
+query o: bitstring;
+  inj-event(otpk_used(o)) ==> inj-event(otpk_issued(o)).
 
-query x: bitstring; inj-event(root_derived(x)).
+let bob =
+  new spk: bitstring;
+  new otpk: bitstring;
+  let sig = sign(spk, skB) in
+  event bob_signed_spk(pk(skB), spk);
+  event otpk_issued(otpk);
+  out(c, (pk(skB), spk, sig, otpk));
+  in(c, (ct: bitstring, ikA: pkey, used_otpk: bitstring));
+  if ikA = pk(skA) then
+  if used_otpk = otpk then
+  (
+    event otpk_used(otpk);
+    let ad = concat(pk_bytes(ikA), pk_bytes(pk(skB))) in
+    let k = hkdf(concat(dh(skB, ikA), dh(skB, ikA))) in
+    let m = aead_dec(k, ct, ad) in
+    if m = msg then
+      event state_advanced(ct)
+  ).
 
-let processA =
-  event alice_initiates;
-  (* DH1 = DH(Identity_Alice, SignedPreKey_Bob) *)
-  let dh1 = dh(identity_a_priv, signed_prekey_b) in
-  event dh1_computed(dh1);
-  (* DH2 = DH(Ephemeral_Alice, Identity_Bob) *)
-  let dh2 = dh(ephemeral_a_priv, identity_b) in
-  event dh2_computed(dh2);
-  (* DH3 = DH(Ephemeral_Alice, SignedPreKey_Bob) *)
-  let dh3 = dh(ephemeral_a_priv, signed_prekey_b) in
-  event dh3_computed(dh3);
-  (* DH4 = DH(Ephemeral_Alice, OneTimePreKey_Bob) *)
-  let dh4 = dh(ephemeral_a_priv, one_time_prekey_b) in
-  event dh4_computed(dh4);
-  let combined = concat(dh1, concat(dh2, concat(dh3, dh4))) in
-  let salt = hkdf_salt_x3dh() in
-  let info = hkdf_info_x3dh() in
-  let root = hkdf(salt, combined, info) in
-  event root_derived(root);
-  out(c, root).
+let alice =
+  in(c, (ikB: pkey, spk: bitstring, sig: bitstring, o: bitstring));
+  if ikB = pk(skB) then
+  if checksign(sig, ikB, spk) = true then
+  (
+    event alice_verified_spk(ikB, spk);
+    event alice_completed(spk);
+    let ad = concat(pk_bytes(pk(skA)), pk_bytes(ikB)) in
+    let k = hkdf(concat(dh(skA, ikB), dh(skA, ikB))) in
+    let ct = aead_enc(k, msg, ad) in
+    event message_sent(msg, ad, ct);
+    out(c, (ct, pk(skA), o))
+  ).
 
-let processB =
-  in(c, x: bitstring);
-  event bob_responds;
-  out(c, x).
+let adversary_forge =
+  in(c, (ikB: pkey, spk: bitstring, sig: bitstring, o: bitstring));
+  out(c, (spk, pk(skA), o)).
 
 process
-  (!processA)
-  |
-  (!processB)
+  (bob) | (alice) | (adversary_forge)

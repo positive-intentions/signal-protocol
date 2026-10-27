@@ -158,39 +158,47 @@ impl DoubleRatchetMessage {
     }
 }
 
+/// Initiator session: first chain DH against Bob's SPK (SP-2026-012).
 #[wasm_bindgen]
-pub fn initialize_double_ratchet(
-    shared_secret: &Uint8Array,
-    is_initiator: bool,
-) -> Result<DoubleRatchetState, JsValue> {
-    log(&format!(
-        "Initializing Double Ratchet (initiator: {})",
-        is_initiator
-    ));
-    let shared_secret_bytes = uint8_array_to_vec(shared_secret);
-    signal_protocol_core::initialize_double_ratchet_internal(&shared_secret_bytes, is_initiator)
-        .map(core_to_wasm_state)
-        .map_err(|e| JsValue::from_str(&e.to_string()))
-}
-
-/// Initialize with associated data and optional remote ratchet/SPK public (initiator).
-#[wasm_bindgen]
-pub fn initialize_double_ratchet_with_ad(
+pub fn initialize_double_ratchet_initiator(
     shared_secret: &Uint8Array,
     associated_data: &Uint8Array,
-    is_initiator: bool,
-    remote_ratchet_public: Option<Uint8Array>,
+    remote_spk_public: &Uint8Array,
 ) -> Result<DoubleRatchetState, JsValue> {
+    log("Initializing Double Ratchet (initiator)");
     let shared_secret_bytes = uint8_array_to_vec(shared_secret);
     let ad_bytes = uint8_array_to_vec(associated_data);
-    let remote = remote_ratchet_public
-        .as_ref()
-        .map(|k| uint8_array_to_vec(k));
-    signal_protocol_core::initialize_double_ratchet_with_ad(
+    let remote = uint8_array_to_vec(remote_spk_public);
+    signal_protocol_core::initialize_double_ratchet(
         &shared_secret_bytes,
         &ad_bytes,
-        is_initiator,
-        remote.as_ref().map(|v| v.as_slice()),
+        signal_protocol_core::RatchetRole::Initiator {
+            remote_spk_public: &remote,
+        },
+    )
+    .map(core_to_wasm_state)
+    .map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+/// Responder session: seed local SPK so Alice's first message matches (SP-2026-012).
+#[wasm_bindgen]
+pub fn initialize_double_ratchet_responder(
+    shared_secret: &Uint8Array,
+    associated_data: &Uint8Array,
+    local_spk_public: &Uint8Array,
+    local_spk_private: &Uint8Array,
+) -> Result<DoubleRatchetState, JsValue> {
+    log("Initializing Double Ratchet (responder)");
+    let shared_secret_bytes = uint8_array_to_vec(shared_secret);
+    let ad_bytes = uint8_array_to_vec(associated_data);
+    let local = signal_protocol_core::KeyPair {
+        public_key: uint8_array_to_vec(local_spk_public),
+        private_key: uint8_array_to_vec(local_spk_private),
+    };
+    signal_protocol_core::initialize_double_ratchet(
+        &shared_secret_bytes,
+        &ad_bytes,
+        signal_protocol_core::RatchetRole::Responder { local_spk: &local },
     )
     .map(core_to_wasm_state)
     .map_err(|e| JsValue::from_str(&e.to_string()))
@@ -300,13 +308,18 @@ pub(crate) fn cleanup_skipped_message_keys_internal(
     removed
 }
 
-/// Internal version for native testing - delegates to core
-pub(crate) fn initialize_double_ratchet_internal(
+/// Native test helper: matching Alice/Bob pair with shared SPK.
+pub(crate) fn test_ratchet_pair(
     shared_secret: &[u8],
-    is_initiator: bool,
-) -> Result<DoubleRatchetState, crate::rust::error::SignalError> {
-    signal_protocol_core::initialize_double_ratchet_internal(shared_secret, is_initiator)
-        .map(core_to_wasm_state)
+    associated_data: &[u8],
+) -> Result<(DoubleRatchetState, DoubleRatchetState, KeyPair), crate::rust::error::SignalError> {
+    let (alice, bob, spk) =
+        signal_protocol_core::test_ratchet_pair(shared_secret, associated_data)?;
+    Ok((
+        core_to_wasm_state(alice),
+        core_to_wasm_state(bob),
+        core_to_wasm_keypair(spk),
+    ))
 }
 
 /// Internal encrypt for native testing - delegates to core
@@ -348,24 +361,48 @@ pub(crate) fn double_ratchet_decrypt_internal(
 #[allow(dead_code)]
 mod tests {
     use super::*;
-    use wasm_bindgen_test::*;
-    wasm_bindgen_test_configure!(run_in_browser);
     use crate::rust::keys::*;
     use crate::rust::x3dh::x3dh_initiate;
+    use wasm_bindgen_test::*;
+
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    fn ad_bytes() -> &'static [u8] {
+        b"IK_A||IK_B_test_ad______________"
+    }
+
+    fn ad_u8() -> Uint8Array {
+        Uint8Array::from(ad_bytes())
+    }
+
+    fn pair() -> (DoubleRatchetState, DoubleRatchetState) {
+        let (alice, bob, _) = test_ratchet_pair(&[1u8; 32], ad_bytes()).unwrap();
+        (alice, bob)
+    }
 
     #[wasm_bindgen_test]
     fn test_double_ratchet_initialization() {
         let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
+        let ad = ad_u8();
+        let spk = generate_signed_prekey().unwrap();
+        let alice_state =
+            initialize_double_ratchet_initiator(&shared_secret, &ad, &spk.public_key()).unwrap();
         assert_eq!(alice_state.sending_message_number, 0);
         assert_eq!(alice_state.receiving_message_number, 0);
         assert!(alice_state.sending_chain_key.is_some());
         assert!(alice_state.sending_dh_keypair.is_some());
 
-        let bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let bob_state = initialize_double_ratchet_responder(
+            &shared_secret,
+            &ad,
+            &spk.public_key(),
+            &spk.private_key(),
+        )
+        .unwrap();
         assert_eq!(bob_state.sending_message_number, 0);
         assert_eq!(bob_state.receiving_message_number, 0);
         assert!(bob_state.sending_chain_key.is_none());
+        assert!(bob_state.sending_dh_keypair.is_some());
     }
 
     #[wasm_bindgen_test]
@@ -394,9 +431,7 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn test_double_ratchet_encrypt_decrypt() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = pair();
         let plaintext = Uint8Array::from("Hello Bob!".as_bytes());
         let encrypted_message = double_ratchet_encrypt(&mut alice_state, &plaintext).unwrap();
         assert!(encrypted_message.ciphertext().length() > plaintext.length());
@@ -410,9 +445,7 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn test_aad_functionality() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = pair();
         let plaintext = Uint8Array::from("Test message with AAD".as_bytes());
         let encrypted_message = double_ratchet_encrypt(&mut alice_state, &plaintext).unwrap();
         let ciphertext_len = encrypted_message.ciphertext().length();
@@ -428,9 +461,7 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn test_aad_tampering_protection() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = pair();
         let plaintext = Uint8Array::from("Secret message".as_bytes());
         let encrypted_message = double_ratchet_encrypt(&mut alice_state, &plaintext).unwrap();
         let decrypted = double_ratchet_decrypt(&mut bob_state, &encrypted_message).unwrap();
@@ -444,9 +475,7 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn test_bidirectional_multiple_ratchet_steps() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = pair();
         let msg1 = Uint8Array::from("Message 1".as_bytes());
         let enc1 = double_ratchet_encrypt(&mut alice_state, &msg1).unwrap();
         let dec1 = double_ratchet_decrypt(&mut bob_state, &enc1).unwrap();
@@ -463,63 +492,60 @@ mod tests {
         assert_eq!(String::from_utf8(dec3.to_vec()).unwrap(), "Message 3");
     }
 
-    // Signal Double Ratchet semantics (per spec):
-    //   - At init, both parties share the same root_key (= shared_secret).
-    //   - Sending a message does NOT advance root_key.
-    //   - Receiving a message with a new DH public key triggers DHRatchet,
-    //     which performs TWO KDF_RK calls - one matching the sender's last
-    //     sending ratchet, plus one fresh sending ratchet on the receiver.
-    //   - After a ping-pong (A->B, B->A), the receiver is always one DH
-    //     ratchet step ahead of the peer, so the root_keys intentionally
-    //     diverge. Previously this test asserted the opposite, which is
-    //     mathematically impossible for any correct DR implementation.
+    // SP-2026 secure init: Alice's root is DH-derived against Bob's SPK (not
+    // equal to shared_secret). Bob's root stays equal to shared_secret until
+    // first receive. Alice and Bob roots may differ at init.
     #[wasm_bindgen_test]
     fn test_root_key_invariants_after_init() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
-        let alice_root = alice_state.root_key().to_vec();
-        let bob_root = bob_state.root_key().to_vec();
-        assert_eq!(alice_root, bob_root, "roots must match at init");
-        assert_eq!(
+        let shared_secret = [1u8; 32];
+        let (alice_state, bob_state, _) = test_ratchet_pair(&shared_secret, ad_bytes()).unwrap();
+        let alice_root = alice_state.root_key.clone();
+        let bob_root = bob_state.root_key.clone();
+        assert_ne!(
             alice_root,
-            vec![1u8; 32],
-            "initial root equals shared_secret"
+            shared_secret.to_vec(),
+            "Alice's root is DH-derived, not equal to shared_secret"
+        );
+        assert_eq!(
+            bob_root,
+            shared_secret.to_vec(),
+            "Bob's root equals shared_secret until first receive"
+        );
+        assert_ne!(
+            alice_root, bob_root,
+            "Alice and Bob roots may differ at init"
         );
     }
 
     #[wasm_bindgen_test]
     fn test_send_does_not_advance_root_key() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let before = alice_state.root_key().to_vec();
+        let (mut alice_state, _) = pair();
+        let before = alice_state.root_key.clone();
         let _enc =
             double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 1".as_bytes()))
                 .unwrap();
-        let after = alice_state.root_key().to_vec();
+        let after = alice_state.root_key.clone();
         assert_eq!(before, after, "encrypt must not advance root_key");
     }
 
     #[wasm_bindgen_test]
     fn test_receive_advances_root_key_and_diverges() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
-        let initial_root = alice_state.root_key().to_vec();
+        let (mut alice_state, mut bob_state) = pair();
+        let alice_root_at_init = alice_state.root_key.clone();
+        let bob_root_at_init = bob_state.root_key.clone();
 
         let enc1 =
             double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 1".as_bytes()))
                 .unwrap();
         let _ = double_ratchet_decrypt(&mut bob_state, &enc1).unwrap();
 
-        let bob_root_after_recv = bob_state.root_key().to_vec();
+        let bob_root_after_recv = bob_state.root_key.clone();
         assert_ne!(
-            bob_root_after_recv, initial_root,
+            bob_root_after_recv, bob_root_at_init,
             "Bob's root must advance on first DH ratchet"
         );
         assert_eq!(
-            alice_state.root_key().to_vec(),
-            initial_root,
+            alice_state.root_key, alice_root_at_init,
             "Alice's root unchanged until she receives"
         );
 
@@ -528,9 +554,9 @@ mod tests {
                 .unwrap();
         let _ = double_ratchet_decrypt(&mut alice_state, &enc2).unwrap();
 
-        let alice_root_after_recv = alice_state.root_key().to_vec();
+        let alice_root_after_recv = alice_state.root_key.clone();
         assert_ne!(
-            alice_root_after_recv, initial_root,
+            alice_root_after_recv, alice_root_at_init,
             "Alice's root must advance after DH ratchet on receive"
         );
         assert_ne!(
@@ -541,9 +567,7 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn test_decryption_survives_root_key_divergence() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = pair();
 
         let enc1 =
             double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 1".as_bytes()))
@@ -557,7 +581,6 @@ mod tests {
         let dec2 = double_ratchet_decrypt(&mut alice_state, &enc2).unwrap();
         assert_eq!(String::from_utf8(dec2.to_vec()).unwrap(), "Message 2");
 
-        // Roots have diverged at this point - confirm the protocol still works.
         let enc3 =
             double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 3".as_bytes()))
                 .unwrap();
@@ -567,9 +590,7 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn test_out_of_order_messages() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = pair();
         let msg1 =
             double_ratchet_encrypt(&mut alice_state, &Uint8Array::from("Message 1".as_bytes()))
                 .unwrap();
@@ -591,9 +612,7 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn test_skipped_key_cleanup() {
-        let shared_secret = Uint8Array::from(&[1u8; 32][..]);
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let (mut alice_state, mut bob_state) = pair();
         let mut messages = Vec::new();
         for i in 0..10 {
             let plaintext = Uint8Array::from(format!("Message {}", i).as_bytes());
@@ -610,8 +629,16 @@ mod tests {
     #[wasm_bindgen_test]
     fn test_error_conditions() {
         let short_secret = Uint8Array::from(&[1u8; 16][..]);
-        let result = initialize_double_ratchet(&short_secret, true);
+        let ad = ad_u8();
+        let spk = generate_signed_prekey().unwrap();
+        let result = initialize_double_ratchet_initiator(&short_secret, &ad, &spk.public_key());
         assert!(result.is_err());
+
+        let empty_ad = Uint8Array::from(&[][..]);
+        let ss = Uint8Array::from(&[1u8; 32][..]);
+        let result = initialize_double_ratchet_initiator(&ss, &empty_ad, &spk.public_key());
+        assert!(result.is_err());
+
         let mut empty_state = DoubleRatchetState::new();
         let plaintext = Uint8Array::from("test".as_bytes());
         let result = double_ratchet_encrypt(&mut empty_state, &plaintext);
@@ -624,17 +651,33 @@ mod tests {
         let alice_ephemeral = generate_ephemeral_keypair().unwrap();
         let bob_identity = generate_identity_keypair().unwrap();
         let bob_signed_prekey = generate_signed_prekey().unwrap();
+        let bob_spk_sig =
+            sign_prekey(&bob_identity.private_key(), &bob_signed_prekey.public_key()).unwrap();
         let x3dh_result = x3dh_initiate(
             &alice_identity.private_key(),
             &alice_ephemeral.private_key(),
+            &alice_identity.public_key(),
             &bob_identity.public_key(),
             &bob_signed_prekey.public_key(),
+            &bob_spk_sig,
             None,
         )
         .unwrap();
         let shared_secret = x3dh_result.shared_secret();
-        let mut alice_state = initialize_double_ratchet(&shared_secret, true).unwrap();
-        let mut bob_state = initialize_double_ratchet(&shared_secret, false).unwrap();
+        let ad = x3dh_result.associated_data();
+        let mut alice_state = initialize_double_ratchet_initiator(
+            &shared_secret,
+            &ad,
+            &bob_signed_prekey.public_key(),
+        )
+        .unwrap();
+        let mut bob_state = initialize_double_ratchet_responder(
+            &shared_secret,
+            &ad,
+            &bob_signed_prekey.public_key(),
+            &bob_signed_prekey.private_key(),
+        )
+        .unwrap();
         let plaintext = Uint8Array::from("X3DH -> Double Ratchet integration test".as_bytes());
         let encrypted = double_ratchet_encrypt(&mut alice_state, &plaintext).unwrap();
         let decrypted = double_ratchet_decrypt(&mut bob_state, &encrypted).unwrap();

@@ -203,15 +203,20 @@ const exchangeResult = await SignalWasmHelpers.performX3DHKeyExchange(
   wasmInstance,
 );
 
-// Initialize Double Ratchet
+// Initialize Double Ratchet (SP-2026: role + SPK + non-empty AD)
+// Use Bob's SPK from the X3DH bundle — do not generate a fresh SPK here.
 const wasmModule = await loadWasmModule();
-const aliceState = wasmModule.initialize_double_ratchet(
+const ad = exchangeResult.associatedData; // IK_A || IK_B from X3DH
+const aliceState = wasmModule.initialize_double_ratchet_initiator(
   exchangeResult.sharedSecret,
-  true, // isInitiator
+  ad,
+  bobBundle.signedPrekey,
 );
-const bobState = wasmModule.initialize_double_ratchet(
+const bobState = wasmModule.initialize_double_ratchet_responder(
   exchangeResult.sharedSecret,
-  false, // isInitiator
+  ad,
+  bob.signedPrekeyPair.publicKey,
+  bob.signedPrekeyPair.privateKey,
 );
 
 // Encrypt and decrypt messages

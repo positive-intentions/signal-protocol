@@ -29,6 +29,8 @@ import {
   loadWasmModule,
 } from "../../wasm-bindings.js";
 import { CryptoDemo, CodeDisplay, OperationStatus } from "ui";
+let __drSpk = null;
+let __drAd = null;
 
 // Mock WASM implementation for demo purposes
 const mockWasmImplementation = {
@@ -83,9 +85,11 @@ const mockWasmImplementation = {
   async x3dhInitiate(
     aliceIdentityPrivate,
     aliceEphemeralPrivate,
+    aliceIdentityPublic,
     bobIdentityPublic,
     bobSignedPrekeyPublic,
-    bobOneTimePrekeyPublic,
+    bobSignedPrekeySignature,
+    bobOneTimePrekeyPublic = null,
   ) {
     await new Promise((resolve) => setTimeout(resolve, 100));
     return {
@@ -99,6 +103,7 @@ const mockWasmImplementation = {
     bobIdentityPrivate,
     bobSignedPrekeyPrivate,
     bobOneTimePrekeyPrivate,
+    bobIdentityPublic,
     aliceIdentityPublic,
     aliceEphemeralPublic,
   ) {
@@ -242,15 +247,19 @@ const SignalProtocolWasmDemo = () => {
         async x3dhInitiate(
           aliceIdentityPrivate,
           aliceEphemeralPrivate,
+          aliceIdentityPublic,
           bobIdentityPublic,
           bobSignedPrekeyPublic,
-          bobOneTimePrekeyPublic,
+          bobSignedPrekeySignature,
+          bobOneTimePrekeyPublic = null,
         ) {
           const result = wasmModule.x3dh_initiate(
             aliceIdentityPrivate,
             aliceEphemeralPrivate,
+            aliceIdentityPublic,
             bobIdentityPublic,
             bobSignedPrekeyPublic,
+            bobSignedPrekeySignature,
             bobOneTimePrekeyPublic,
           );
           return {
@@ -264,6 +273,7 @@ const SignalProtocolWasmDemo = () => {
           bobIdentityPrivate,
           bobSignedPrekeyPrivate,
           bobOneTimePrekeyPrivate,
+          bobIdentityPublic,
           aliceIdentityPublic,
           aliceEphemeralPublic,
         ) {
@@ -271,6 +281,7 @@ const SignalProtocolWasmDemo = () => {
             bobIdentityPrivate,
             bobSignedPrekeyPrivate,
             bobOneTimePrekeyPrivate,
+            bobIdentityPublic,
             aliceIdentityPublic,
             aliceEphemeralPublic,
           );
@@ -282,15 +293,35 @@ const SignalProtocolWasmDemo = () => {
         },
 
         async encryptMessage(sharedSecret, plaintext, messageNumber) {
-          const result = wasmModule.encrypt_message(
-            sharedSecret,
-            plaintext,
-            messageNumber,
-          );
+          // SP-2026-016: legacy encrypt_message removed; use Double Ratchet
+          if (!this._drAlice) {
+            const spk = wasmModule.generate_signed_prekey();
+            const ad = new TextEncoder().encode(
+              "IK_A||IK_B_story_ad______________",
+            );
+            this._drAlice = wasmModule.initialize_double_ratchet_initiator(
+              sharedSecret,
+              ad,
+              spk.public_key,
+            );
+            this._drBob = wasmModule.initialize_double_ratchet_responder(
+              sharedSecret,
+              ad,
+              spk.public_key,
+              spk.private_key,
+            );
+          }
+          const pt =
+            typeof plaintext === "string"
+              ? new TextEncoder().encode(plaintext)
+              : plaintext;
+          const envelope = wasmModule.double_ratchet_encrypt(this._drAlice, pt);
+          this._lastEnvelope = envelope;
           return {
-            ciphertext: result.ciphertext,
-            messageKey: result.message_key,
-            messageNumber,
+            ciphertext: envelope.ciphertext,
+            messageKey: new Uint8Array(0),
+            messageNumber: envelope.message_number,
+            envelope,
           };
         },
 
@@ -300,12 +331,12 @@ const SignalProtocolWasmDemo = () => {
           messageKey,
           messageNumber,
         ) {
-          return wasmModule.decrypt_message(
-            sharedSecret,
-            ciphertext,
-            messageKey,
-            messageNumber,
-          );
+          // SP-2026-016: legacy decrypt_message removed; use Double Ratchet
+          const envelope = this._lastEnvelope;
+          if (!envelope || !this._drBob) {
+            throw new Error("No Double Ratchet session/envelope for decrypt");
+          }
+          return wasmModule.double_ratchet_decrypt(this._drBob, envelope);
         },
 
         bufferToHex(buffer) {
@@ -391,8 +422,10 @@ const SignalProtocolWasmDemo = () => {
       const aliceResult = await wasmInstance.x3dhInitiate(
         aliceIdentity.privateKey,
         aliceEphemeral.privateKey,
+        aliceIdentity.publicKey,
         bobIdentity.publicKey,
         bobSignedPrekey.publicKey,
+        signedPrekeySignature,
         bobOneTimePrekey.publicKey,
       );
       console.log("✅ Alice X3DH result:", aliceResult);
@@ -402,6 +435,7 @@ const SignalProtocolWasmDemo = () => {
         bobIdentity.privateKey,
         bobSignedPrekey.privateKey,
         bobOneTimePrekey.privateKey,
+        bobIdentity.publicKey,
         aliceIdentity.publicKey,
         aliceEphemeral.publicKey,
       );
@@ -547,11 +581,17 @@ const SignalProtocolWasmDemo = () => {
       const bob = await wasmInstance.generateIdentityKeyPair();
       const ephemeral = await wasmInstance.generateEphemeralKeyPair();
       const prekey = await wasmInstance.generateSignedPrekey();
+      const prekeySig = await wasmInstance.signData(
+        bob.privateKey,
+        prekey.publicKey,
+      );
       await wasmInstance.x3dhInitiate(
         alice.privateKey,
         ephemeral.privateKey,
+        alice.publicKey,
         bob.publicKey,
         prekey.publicKey,
+        prekeySig,
         null,
       );
     }
@@ -581,13 +621,20 @@ const SignalProtocolWasmDemo = () => {
     try {
       const wasmModule = await loadWasmModule();
       const wasmSharedSecret = new Uint8Array(32).fill(42);
-      const wasmAliceRatchet = wasmModule.initialize_double_ratchet(
-        wasmSharedSecret,
-        true,
+      const __spk = wasmModule.generate_signed_prekey();
+      const __ad = new TextEncoder().encode(
+        "IK_A||IK_B_story_ad______________",
       );
-      const wasmBobRatchet = wasmModule.initialize_double_ratchet(
+      const wasmAliceRatchet = wasmModule.initialize_double_ratchet_initiator(
         wasmSharedSecret,
-        false,
+        __ad,
+        __spk.public_key,
+      );
+      const wasmBobRatchet = wasmModule.initialize_double_ratchet_responder(
+        wasmSharedSecret,
+        __ad,
+        __spk.public_key,
+        __spk.private_key,
       );
 
       start = performance.now();
@@ -1191,32 +1238,57 @@ const PerformanceFocusDemo = () => {
         async x3dhInitiate(
           aliceIdentityPrivate,
           aliceEphemeralPrivate,
+          aliceIdentityPublic,
           bobIdentityPublic,
           bobSignedPrekeyPublic,
-          bobOneTimePrekeyPublic,
+          bobSignedPrekeySignature,
+          bobOneTimePrekeyPublic = null,
         ) {
           const result = wasmModule.x3dh_initiate(
             aliceIdentityPrivate,
             aliceEphemeralPrivate,
+            aliceIdentityPublic,
             bobIdentityPublic,
             bobSignedPrekeyPublic,
+            bobSignedPrekeySignature,
             bobOneTimePrekeyPublic,
           );
           return {
             sharedSecret: result.shared_secret,
             associatedData: result.associated_data,
+            usedOneTimePrekey: bobOneTimePrekeyPublic !== null,
           };
         },
         async encryptMessage(sharedSecret, plaintext, messageNumber) {
-          const result = wasmModule.encrypt_message(
-            sharedSecret,
-            plaintext,
-            messageNumber,
-          );
+          // SP-2026-016: legacy encrypt_message removed; use Double Ratchet
+          if (!this._drAlice) {
+            const spk = wasmModule.generate_signed_prekey();
+            const ad = new TextEncoder().encode(
+              "IK_A||IK_B_story_ad______________",
+            );
+            this._drAlice = wasmModule.initialize_double_ratchet_initiator(
+              sharedSecret,
+              ad,
+              spk.public_key,
+            );
+            this._drBob = wasmModule.initialize_double_ratchet_responder(
+              sharedSecret,
+              ad,
+              spk.public_key,
+              spk.private_key,
+            );
+          }
+          const pt =
+            typeof plaintext === "string"
+              ? new TextEncoder().encode(plaintext)
+              : plaintext;
+          const envelope = wasmModule.double_ratchet_encrypt(this._drAlice, pt);
+          this._lastEnvelope = envelope;
           return {
-            ciphertext: result.ciphertext,
-            messageKey: result.message_key,
-            messageNumber,
+            ciphertext: envelope.ciphertext,
+            messageKey: new Uint8Array(0),
+            messageNumber: envelope.message_number,
+            envelope,
           };
         },
         async decryptMessage(
@@ -1225,17 +1297,32 @@ const PerformanceFocusDemo = () => {
           messageKey,
           messageNumber,
         ) {
-          return wasmModule.decrypt_message(
-            sharedSecret,
-            ciphertext,
-            messageKey,
-            messageNumber,
-          );
+          // SP-2026-016: legacy decrypt_message removed; use Double Ratchet
+          const envelope = this._lastEnvelope;
+          if (!envelope || !this._drBob) {
+            throw new Error("No Double Ratchet session/envelope for decrypt");
+          }
+          return wasmModule.double_ratchet_decrypt(this._drBob, envelope);
         },
         async initializeDoubleRatchet(sharedSecret, isInitiator) {
-          return wasmModule.initialize_double_ratchet(
+          if (!__drSpk) {
+            __drSpk = wasmModule.generate_signed_prekey();
+            __drAd = new TextEncoder().encode(
+              "IK_A||IK_B_story_ad______________",
+            );
+          }
+          if (isInitiator) {
+            return wasmModule.initialize_double_ratchet_initiator(
+              sharedSecret,
+              __drAd,
+              __drSpk.public_key,
+            );
+          }
+          return wasmModule.initialize_double_ratchet_responder(
             sharedSecret,
-            isInitiator,
+            __drAd,
+            __drSpk.public_key,
+            __drSpk.private_key,
           );
         },
         async doubleRatchetEncrypt(ratchetState, plaintext) {
@@ -1304,11 +1391,17 @@ const PerformanceFocusDemo = () => {
         const bob = await wasmInstance.generateIdentityKeyPair();
         const ephemeral = await wasmInstance.generateEphemeralKeyPair();
         const prekey = await wasmInstance.generateSignedPrekey();
+        const prekeySig = await wasmInstance.signData(
+          bob.privateKey,
+          prekey.publicKey,
+        );
         await wasmInstance.x3dhInitiate(
           alice.privateKey,
           ephemeral.privateKey,
+          alice.publicKey,
           bob.publicKey,
           prekey.publicKey,
+          prekeySig,
           null,
         );
       }
@@ -1341,13 +1434,20 @@ const PerformanceFocusDemo = () => {
       try {
         const wasmModule = await loadWasmModule();
         const wasmSharedSecret = new Uint8Array(32).fill(42);
-        const wasmAliceRatchet = wasmModule.initialize_double_ratchet(
-          wasmSharedSecret,
-          true,
+        const __spk = wasmModule.generate_signed_prekey();
+        const __ad = new TextEncoder().encode(
+          "IK_A||IK_B_story_ad______________",
         );
-        const wasmBobRatchet = wasmModule.initialize_double_ratchet(
+        const wasmAliceRatchet = wasmModule.initialize_double_ratchet_initiator(
           wasmSharedSecret,
-          false,
+          __ad,
+          __spk.public_key,
+        );
+        const wasmBobRatchet = wasmModule.initialize_double_ratchet_responder(
+          wasmSharedSecret,
+          __ad,
+          __spk.public_key,
+          __spk.private_key,
         );
 
         start = performance.now();

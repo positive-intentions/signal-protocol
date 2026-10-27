@@ -192,13 +192,7 @@ mod tests {
     #[test]
     fn x3dh_bad_key_length() {
         let err = x3dh_initiate_internal(
-            &[0u8; 16],
-            &[0u8; 32],
-            &[0u8; 32],
-            &[0u8; 32],
-            &[0u8; 32],
-            &[0u8; 64],
-            None,
+            &[0u8; 16], &[0u8; 32], &[0u8; 32], &[0u8; 32], &[0u8; 32], &[0u8; 64], None,
         )
         .unwrap_err();
         assert!(matches!(

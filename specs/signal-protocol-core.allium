@@ -1,17 +1,19 @@
 -- allium: 3
 -- signal-protocol-core.allium
 --
--- Scope: behavioural contract for signal-protocol-core X3DH + Double Ratchet.
+-- Scope: behavioural contract for signal-protocol-core X3DH + Double Ratchet
+--        and the cascade product invariants that bind OTPK / decrypt commit.
 -- Includes: handshake entities, session ratchet rules, skipped-key handling,
---           associated-data binding, signed-prekey verification.
+--           associated-data binding, signed-prekey verification, fail-closed
+--           ratchet init (role + SPK + AD), XEdDSA canonicity.
 -- Excludes:
 --   - WASM/JS storybook and gallery UI
 --   - Formal-proof stub builds without crypto-backend
 --   - Non-domain infrastructure (logging, webpack, Docker)
 --
 -- Finding IDs refer to security/SP-2026-library-audit.md.
--- SP-2026-001–011 are mitigated in-tree; regenerate identities after upgrade.
--- Open questions are design choices not yet decided.
+-- SP-2026-001–017 are mitigated in-tree; regenerate identities after upgrade.
+-- No open questions remain for this hardening pass.
 
 entity IdentityKey {
     public: Bytes
@@ -21,11 +23,12 @@ entity IdentityKey {
 entity SignedPrekey {
     public: Bytes
     private: Bytes
-    signature: Bytes?
-    signing_public: Bytes?
+    signature: Bytes
+    sign_public: Bytes
 }
 
 entity OneTimePrekey {
+    id: Integer
     public: Bytes
     private: Bytes
 }
@@ -74,17 +77,19 @@ config {
 }
 
 -- Mitigated (SP-2026-008): max_skipped_total enforced with FIFO eviction.
+-- Forged large PN/N leave skipped set unchanged (tentative discard).
 invariant SkippedKeysAreBounded {
     for s in Sessions:
         s.skipped.count <= config.max_skipped_total
 }
 
--- Desired: one-time prekeys are not reused across handshakes (application + library).
+-- Mitigated (SP-2026-014): cascade wire v4 binds OTPK id; responder removes
+-- exactly that pool entry once. Library + product enforce single-use.
 invariant OneTimePreKeysBelongToOneSession {
     for a in Handshakes:
         for b in Handshakes:
             a != b and a.one_time_prekey != null
-                implies a.one_time_prekey != b.one_time_prekey
+                implies a.one_time_prekey.id != b.one_time_prekey.id
 }
 
 -- Desired: responder does not send before establishing a receiving ratchet.
@@ -94,10 +99,17 @@ invariant ResponderCannotSendBeforeReceiving {
             implies s.sending_chain_key = null
 }
 
--- Mitigated (SP-2026-002, SP-2026-003): commit-after-AEAD.
+-- Mitigated (SP-2026-002, SP-2026-003): DR commit-after-AEAD.
 invariant DecryptCommitsOnlyAfterTag {
     for d in DecryptAttempts:
         d.state_mutated implies d.tag_ok
+}
+
+-- Mitigated (SP-2026-015): product decrypt_from_peer / group path clone then
+-- assign only after inner AEAD succeeds.
+invariant ProductDecryptCommitsAfterAuth {
+    for d in ProductDecryptAttempts:
+        d.local_or_session_committed implies d.inner_aead_ok
 }
 
 -- Mitigated (SP-2026-003): skipped keys removed only after successful decrypt.
@@ -126,6 +138,26 @@ invariant AssociatedDataBindsIdentities {
             or s.associated_data = s.local_identity_public || s.peer_identity_public
 }
 
+-- Mitigated (SP-2026-012): single typed init; empty AD and missing SPK rejected;
+-- no Signal_Initial_Chain branch.
+invariant InitRequiresSpkAndAd {
+    for i in RatchetInits:
+        i.accepted implies
+            length(i.associated_data) > 0
+            and length(i.spk_public) = 32
+            and i.first_chain_via_spk_dh = true
+}
+
+-- Mitigated (SP-2026-013): XEdDSA matches Signal spec (hash1 nonce domain,
+-- sign-bit 0 Edwards encoding, canonical s, single verify candidate).
+invariant XEdDSACanonical {
+    for s in Signatures:
+        s.accepted implies
+            s.s_canonical = true
+            and s.public_sign_bit = 0
+            and s.verify_candidates = 1
+}
+
 -- Mitigated (SP-2026-011): message keys stay inside the library (WASM).
 invariant MessageKeyNotExported {
     for e in EncryptResults:
@@ -137,7 +169,6 @@ rule X3DHInitiate {
 
     requires: exists bundle.identity
     requires: exists bundle.signed_prekey
-    -- intended: library verifies signature before DH
     requires: SignedPrekeySignatureValid(bundle)
 
     ensures:
@@ -145,7 +176,26 @@ rule X3DHInitiate {
             role: initiator,
             associated_data: IdentityAssociatedData(bundle.identity, initiator.identity)
         )
-        Handshake.created(session: session, one_time_prekey: bundle.one_time_prekey)
+        Handshake.created(
+            session: session,
+            one_time_prekey: bundle.one_time_prekey,
+            one_time_prekey_id: bundle.one_time_prekey.id
+        )
+}
+
+rule DoubleRatchetInit {
+    when: HandshakeComplete(shared_secret, associated_data, role)
+
+    requires: length(associated_data) > 0
+    requires: length(shared_secret) = 32
+    requires: role has remote_spk_public or local_spk
+
+    ensures:
+        Session.created(
+            role: role,
+            associated_data: associated_data,
+            first_chain_via_spk_dh: true
+        )
 }
 
 rule DoubleRatchetDecrypt {
@@ -154,7 +204,6 @@ rule DoubleRatchetDecrypt {
     requires: exists session
 
     ensures:
-        -- intended control flow (not current code):
         -- 1) try skipped keys without deleting until tag ok
         -- 2) if new DH: archive previous chain using PN, then ratchet on a tentative copy
         -- 3) derive message key, AEAD open, commit state only if tag ok
@@ -165,5 +214,6 @@ rule DoubleRatchetDecrypt {
         )
 }
 
--- Resolved (SP-2026): SPK verify in initiate; XEdDSA identity; commit-after-AEAD;
--- IK_A||IK_B AD; initiator first-chain DH with remote SPK. Hard break: regenerate IKs.
+-- Resolved (SP-2026 hardening): fail-closed init API; XEdDSA-to-spec + interop
+-- vectors; product clone-commit; wire v4 OTPK id; ProVerif models updated;
+-- cascade 100% line coverage. Hard break: regenerate IKs and re-sign SPK/PQ.

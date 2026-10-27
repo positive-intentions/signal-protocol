@@ -91,11 +91,13 @@ fn insert_skipped_key(
     message_key: Vec<u8>,
 ) -> Result<(), SignalError> {
     if !state.skipped_message_keys.contains_key(&key_id) {
-        if state.skipped_message_keys.len() >= MAX_SKIPPED_TOTAL {
-            return Err(SignalError::InvalidInput(format!(
-                "Skipped message key store full (max {})",
-                MAX_SKIPPED_TOTAL
-            )));
+        // SP-2026-008: FIFO-evict oldest when at capacity (do not hard-fail decrypt).
+        while state.skipped_message_keys.len() >= MAX_SKIPPED_TOTAL {
+            if let Some(oldest) = state.skipped_key_order.first().cloned() {
+                remove_skipped_key(state, &oldest);
+            } else {
+                break;
+            }
         }
         state.skipped_key_order.push(key_id.clone());
     }
@@ -138,45 +140,23 @@ pub fn perform_dh_ratchet_step(
 ) -> Result<(), SignalError> {
     let original_root_key = state.root_key.clone();
 
-    let (new_root_key_for_receiving, receiving_chain_key) = if let Some(ref current_dh_keypair) =
-        state.sending_dh_keypair
-    {
-        let dh_output = simple_ecdh(&current_dh_keypair.private_key, new_remote_public_key)?;
-
-        let combined = hkdf_derive_short(b"Signal_DH_Ratchet", &original_root_key, &dh_output, 64);
-
-        let new_root_key = combined[0..32].to_vec();
-        let recv_chain_key = combined[32..64].to_vec();
-        (new_root_key, recv_chain_key)
-    } else {
-        let recv_chain_key = hkdf_derive_short(
-            b"Signal_Initial_Chain",
-            &state.root_key,
-            HKDF_INFO_CHAIN_KEY,
-            32,
-        );
-        let root_for_receiving = state.root_key.clone();
-        (root_for_receiving, recv_chain_key)
-    };
-
-    state.root_key = new_root_key_for_receiving;
-    state.receiving_chain_key = Some(receiving_chain_key);
+    let current_dh_keypair = state.sending_dh_keypair.as_ref().ok_or_else(|| {
+        SignalError::InvalidInput(
+            "DH ratchet requires a local ratchet keypair (responder must seed SPK)".to_string(),
+        )
+    })?;
+    let dh_output = simple_ecdh(&current_dh_keypair.private_key, new_remote_public_key)?;
+    let combined = hkdf_derive_short(b"Signal_DH_Ratchet", &original_root_key, &dh_output, 64);
+    state.root_key = combined[0..32].to_vec();
+    state.receiving_chain_key = Some(combined[32..64].to_vec());
     state.receiving_dh_public_key = Some(new_remote_public_key.to_vec());
     state.receiving_message_number = 0;
 
     let new_dh_keypair = generate_identity_keypair();
-
-    let root_key_for_sending = if state.sending_dh_keypair.is_some() {
-        &state.root_key
-    } else {
-        &original_root_key
-    };
-
     let sending_dh_output = simple_ecdh(&new_dh_keypair.private_key, new_remote_public_key)?;
-
     let combined = hkdf_derive_short(
         b"Signal_DH_Ratchet",
-        root_key_for_sending,
+        &state.root_key,
         &sending_dh_output,
         64,
     );
@@ -233,86 +213,92 @@ pub fn skip_message_keys(
     Ok(())
 }
 
-/// Initialize a Double Ratchet session.
+/// Role-specific Double Ratchet initialization (SP-2026-012).
 ///
-/// * `associated_data` — typically `IK_A || IK_B` from X3DH (SP-2026-005).
-/// * `remote_ratchet_public` — for the initiator, Bob's signed prekey / ratchet
-///   public so the first sending chain includes a DH step (SP-2026-007).
-#[hax_lib::include]
-pub fn initialize_double_ratchet_internal(
-    shared_secret: &[u8],
-    is_initiator: bool,
-) -> Result<DoubleRatchetState, SignalError> {
-    initialize_double_ratchet_with_ad(shared_secret, &[], is_initiator, None)
+/// Fail-closed: initiator must supply Bob's SPK public; responder must supply
+/// the matching local SPK keypair. Associated data must be non-empty
+/// (typically `IK_A || IK_B` from X3DH).
+pub enum RatchetRole<'a> {
+    /// Alice: first sending chain includes DH against Bob's SPK.
+    Initiator { remote_spk_public: &'a [u8] },
+    /// Bob: seed sending DH with the published SPK so Alice's first message matches.
+    Responder { local_spk: &'a KeyPair },
 }
 
-/// Initialize Double Ratchet state.
-///
-/// * `remote_ratchet_public` — initiator: Bob's SPK/ratchet public (SP-2026-007).
-/// * `local_ratchet_keypair` — responder: Bob's SPK keypair so the first DH matches Alice.
+/// Initialize a Double Ratchet session (only secure init path).
 #[hax_lib::include]
-pub fn initialize_double_ratchet_with_ad(
+pub fn initialize_double_ratchet(
     shared_secret: &[u8],
     associated_data: &[u8],
-    is_initiator: bool,
-    remote_ratchet_public: Option<&[u8]>,
-) -> Result<DoubleRatchetState, SignalError> {
-    initialize_double_ratchet_full(
-        shared_secret,
-        associated_data,
-        is_initiator,
-        remote_ratchet_public,
-        None,
-    )
-}
-
-/// Full init including optional responder SPK keypair.
-pub fn initialize_double_ratchet_full(
-    shared_secret: &[u8],
-    associated_data: &[u8],
-    is_initiator: bool,
-    remote_ratchet_public: Option<&[u8]>,
-    local_ratchet_keypair: Option<&crate::types::KeyPair>,
+    role: RatchetRole<'_>,
 ) -> Result<DoubleRatchetState, SignalError> {
     if shared_secret.len() != 32 {
         return Err(SignalError::InvalidInput(
             "Shared secret must be 32 bytes".to_string(),
         ));
     }
+    if associated_data.is_empty() {
+        return Err(SignalError::InvalidInput(
+            "Associated data must be non-empty (IK_A || IK_B)".to_string(),
+        ));
+    }
 
     let mut state = DoubleRatchetState::new();
     state.root_key = shared_secret.to_vec();
     state.associated_data = associated_data.to_vec();
+    state.previous_chain_length = 0;
 
-    if is_initiator {
-        let keypair = generate_identity_keypair();
-        if let Some(remote) = remote_ratchet_public {
-            let dh_output = simple_ecdh(&keypair.private_key, remote)?;
-            let combined =
-                hkdf_derive_short(b"Signal_DH_Ratchet", &state.root_key, &dh_output, 64);
+    match role {
+        RatchetRole::Initiator { remote_spk_public } => {
+            if remote_spk_public.len() != 32 {
+                return Err(SignalError::InvalidInput(
+                    "Remote SPK public must be 32 bytes".to_string(),
+                ));
+            }
+            let keypair = generate_identity_keypair();
+            let dh_output = simple_ecdh(&keypair.private_key, remote_spk_public)?;
+            let combined = hkdf_derive_short(b"Signal_DH_Ratchet", &state.root_key, &dh_output, 64);
             state.root_key = combined[0..32].to_vec();
             state.sending_chain_key = Some(combined[32..64].to_vec());
-            state.receiving_dh_public_key = Some(remote.to_vec());
-        } else {
-            let initial_chain_key = hkdf_derive_short(
-                b"Signal_Initial_Chain",
-                &state.root_key,
-                HKDF_INFO_CHAIN_KEY,
-                32,
-            );
-            state.sending_chain_key = Some(initial_chain_key);
+            state.receiving_dh_public_key = Some(remote_spk_public.to_vec());
+            state.sending_dh_keypair = Some(keypair);
+            state.sending_message_number = 0;
         }
-        state.sending_dh_keypair = Some(keypair);
-        state.sending_message_number = 0;
-    } else {
-        if let Some(spk) = local_ratchet_keypair {
-            state.sending_dh_keypair = Some(spk.clone());
+        RatchetRole::Responder { local_spk } => {
+            if local_spk.public_key.len() != 32 || local_spk.private_key.len() != 32 {
+                return Err(SignalError::InvalidInput(
+                    "Local SPK keypair must be 32-byte keys".to_string(),
+                ));
+            }
+            state.sending_dh_keypair = Some(local_spk.clone());
+            state.receiving_message_number = 0;
         }
-        state.receiving_message_number = 0;
     }
 
-    state.previous_chain_length = 0;
     Ok(state)
+}
+
+/// Build a matching Alice/Bob session pair for tests (shared SPK).
+pub fn test_ratchet_pair(
+    shared_secret: &[u8],
+    associated_data: &[u8],
+) -> Result<(DoubleRatchetState, DoubleRatchetState, KeyPair), SignalError> {
+    let bob_spk = generate_identity_keypair();
+    let alice = initialize_double_ratchet(
+        shared_secret,
+        associated_data,
+        RatchetRole::Initiator {
+            remote_spk_public: &bob_spk.public_key,
+        },
+    )?;
+    let bob = initialize_double_ratchet(
+        shared_secret,
+        associated_data,
+        RatchetRole::Responder {
+            local_spk: &bob_spk,
+        },
+    )?;
+    Ok((alice, bob, bob_spk))
 }
 
 #[hax_lib::include]
@@ -430,9 +416,10 @@ fn decrypt_on_state(
         skip_message_keys(state, message_number)?;
     }
 
-    let receiving_chain_key = state.receiving_chain_key.as_ref().ok_or_else(|| {
-        SignalError::InvalidInput("No receiving chain key available".to_string())
-    })?;
+    let receiving_chain_key = state
+        .receiving_chain_key
+        .as_ref()
+        .ok_or_else(|| SignalError::InvalidInput("No receiving chain key available".to_string()))?;
 
     if message_number != state.receiving_message_number {
         return Err(SignalError::InvalidInput(format!(
@@ -582,6 +569,15 @@ mod tests {
         [0x42u8; 32]
     }
 
+    fn ad() -> &'static [u8] {
+        b"IK_A||IK_B_test_ad______________"
+    }
+
+    fn pair() -> (DoubleRatchetState, DoubleRatchetState) {
+        let (alice, bob, _) = test_ratchet_pair(&shared_secret(), ad()).unwrap();
+        (alice, bob)
+    }
+
     #[test]
     fn state_new_defaults() {
         let s = DoubleRatchetState::new();
@@ -595,22 +591,55 @@ mod tests {
 
     #[test]
     fn init_rejects_bad_secret_length() {
-        let err = initialize_double_ratchet_internal(&[0u8; 16], true).unwrap_err();
+        let spk = generate_identity_keypair();
+        let err = initialize_double_ratchet(
+            &[0u8; 16],
+            ad(),
+            RatchetRole::Initiator {
+                remote_spk_public: &spk.public_key,
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(err, SignalError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn init_rejects_empty_ad() {
+        let spk = generate_identity_keypair();
+        let err = initialize_double_ratchet(
+            &shared_secret(),
+            b"",
+            RatchetRole::Initiator {
+                remote_spk_public: &spk.public_key,
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(err, SignalError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn init_rejects_bad_spk_length() {
+        let err = initialize_double_ratchet(
+            &shared_secret(),
+            ad(),
+            RatchetRole::Initiator {
+                remote_spk_public: &[0u8; 16],
+            },
+        )
+        .unwrap_err();
         assert!(matches!(err, SignalError::InvalidInput(_)));
     }
 
     #[test]
     fn encrypt_without_chain_fails() {
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (_, mut bob) = pair();
         let err = double_ratchet_encrypt_internal(&mut bob, b"hi").unwrap_err();
         assert!(matches!(err, SignalError::InvalidInput(_)));
     }
 
     #[test]
     fn roundtrip_alice_to_bob() {
-        let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
-
+        let (mut alice, mut bob) = pair();
         let msg = double_ratchet_encrypt_internal(&mut alice, b"hello bob").unwrap();
         let plain = double_ratchet_decrypt_internal(&mut bob, &msg).unwrap();
         assert_eq!(plain, b"hello bob");
@@ -618,8 +647,7 @@ mod tests {
 
     #[test]
     fn bidirectional_messaging() {
-        let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (mut alice, mut bob) = pair();
 
         let m1 = double_ratchet_encrypt_internal(&mut alice, b"ping").unwrap();
         assert_eq!(
@@ -642,8 +670,7 @@ mod tests {
 
     #[test]
     fn out_of_order_skipped_keys() {
-        let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (mut alice, mut bob) = pair();
 
         let m0 = double_ratchet_encrypt_internal(&mut alice, b"msg0").unwrap();
         let m1 = double_ratchet_encrypt_internal(&mut alice, b"msg1").unwrap();
@@ -665,7 +692,7 @@ mod tests {
 
     #[test]
     fn skip_message_keys_too_many() {
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (_, mut bob) = pair();
         bob.receiving_chain_key = Some(vec![1u8; 32]);
         bob.receiving_dh_public_key = Some(vec![2u8; 32]);
         bob.receiving_message_number = 0;
@@ -675,7 +702,7 @@ mod tests {
 
     #[test]
     fn skip_message_keys_noop_paths() {
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (_, mut bob) = pair();
         bob.receiving_message_number = 5;
         assert!(skip_message_keys(&mut bob, 5).is_ok());
         bob.receiving_message_number = 0;
@@ -685,7 +712,7 @@ mod tests {
 
     #[test]
     fn skip_without_dh_public_is_noop() {
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (_, mut bob) = pair();
         bob.receiving_chain_key = Some(vec![3u8; 32]);
         bob.receiving_dh_public_key = None;
         bob.receiving_message_number = 0;
@@ -695,8 +722,7 @@ mod tests {
 
     #[test]
     fn cleanup_skipped_message_keys_fifo() {
-        let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (mut alice, mut bob) = pair();
         let msgs: Vec<_> = (0..5)
             .map(|i| {
                 double_ratchet_encrypt_internal(&mut alice, format!("m{i}").as_bytes()).unwrap()
@@ -717,8 +743,7 @@ mod tests {
 
     #[test]
     fn decrypt_tampered_ciphertext_fails_without_commit() {
-        let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (mut alice, mut bob) = pair();
         let root_before = bob.root_key.clone();
         let mut msg = double_ratchet_encrypt_internal(&mut alice, b"secret").unwrap();
         if let Some(b) = msg.ciphertext.last_mut() {
@@ -726,15 +751,13 @@ mod tests {
         }
         let err = double_ratchet_decrypt_internal(&mut bob, &msg).unwrap_err();
         assert!(matches!(err, SignalError::Decryption(_)));
-        // First message still triggers DH on tentative copy only — root unchanged on failure.
         assert_eq!(bob.root_key, root_before);
-        assert!(bob.receiving_dh_public_key.is_none());
+        assert!(bob.receiving_chain_key.is_none());
     }
 
     #[test]
     fn decrypt_short_ciphertext_fails() {
-        let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (mut alice, mut bob) = pair();
         let mut msg = double_ratchet_encrypt_internal(&mut alice, b"x").unwrap();
         msg.ciphertext = vec![1u8; 8];
         let err = double_ratchet_decrypt_internal(&mut bob, &msg).unwrap_err();
@@ -743,8 +766,7 @@ mod tests {
 
     #[test]
     fn decrypt_message_number_mismatch() {
-        let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (mut alice, mut bob) = pair();
         let msg = double_ratchet_encrypt_internal(&mut alice, b"a").unwrap();
         double_ratchet_decrypt_internal(&mut bob, &msg).unwrap();
         let err = double_ratchet_decrypt_internal(&mut bob, &msg).unwrap_err();
@@ -756,7 +778,7 @@ mod tests {
 
     #[test]
     fn decrypt_missing_receiving_chain_key() {
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+        let (_, mut bob) = pair();
         bob.receiving_dh_public_key = Some(vec![9u8; 32]);
         bob.receiving_chain_key = None;
         bob.receiving_message_number = 0;
@@ -771,19 +793,18 @@ mod tests {
     }
 
     #[test]
-    fn perform_dh_without_prior_sending_keypair() {
-        let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
-        assert!(bob.sending_dh_keypair.is_none());
+    fn perform_dh_without_prior_sending_keypair_fails() {
+        let mut bob = DoubleRatchetState::new();
+        bob.root_key = shared_secret().to_vec();
+        bob.sending_dh_keypair = None;
         let remote = generate_identity_keypair();
-        perform_dh_ratchet_step(&mut bob, &remote.public_key).unwrap();
-        assert!(bob.sending_dh_keypair.is_some());
-        assert!(bob.receiving_chain_key.is_some());
-        assert!(bob.sending_chain_key.is_some());
+        let err = perform_dh_ratchet_step(&mut bob, &remote.public_key).unwrap_err();
+        assert!(matches!(err, SignalError::InvalidInput(_)));
     }
 
     #[test]
     fn perform_dh_with_existing_sending_keypair() {
-        let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
+        let (mut alice, _) = pair();
         assert!(alice.sending_dh_keypair.is_some());
         let remote = generate_identity_keypair();
         let before = alice.root_key.clone();
@@ -806,7 +827,7 @@ mod tests {
 
     #[test]
     fn encrypt_without_dh_keypair_fails() {
-        let mut state = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
+        let (mut state, _) = pair();
         state.sending_dh_keypair = None;
         let err = double_ratchet_encrypt_internal(&mut state, b"x").unwrap_err();
         assert!(matches!(err, SignalError::InvalidInput(_)));
@@ -815,11 +836,12 @@ mod tests {
     #[test]
     fn initiator_with_remote_spk_uses_dh_chain() {
         let bob_spk = generate_identity_keypair();
-        let alice = initialize_double_ratchet_with_ad(
+        let alice = initialize_double_ratchet(
             &shared_secret(),
             b"ad",
-            true,
-            Some(&bob_spk.public_key),
+            RatchetRole::Initiator {
+                remote_spk_public: &bob_spk.public_key,
+            },
         )
         .unwrap();
         assert_eq!(alice.associated_data, b"ad");
@@ -828,5 +850,23 @@ mod tests {
             Some(bob_spk.public_key.as_slice())
         );
         assert!(alice.sending_chain_key.is_some());
+    }
+
+    #[test]
+    fn forged_large_pn_does_not_mutate_skipped_keys() {
+        let (mut alice, mut bob) = pair();
+        let m0 = double_ratchet_encrypt_internal(&mut alice, b"hello").unwrap();
+        double_ratchet_decrypt_internal(&mut bob, &m0).unwrap();
+        let skipped_before = bob.skipped_message_keys.clone();
+        let order_before = bob.skipped_key_order.clone();
+        let forged = DoubleRatchetMessage {
+            ciphertext: vec![0u8; 40],
+            dh_public_key: generate_identity_keypair().public_key,
+            message_number: 0,
+            previous_chain_length: 500,
+        };
+        assert!(double_ratchet_decrypt_internal(&mut bob, &forged).is_err());
+        assert_eq!(bob.skipped_message_keys, skipped_before);
+        assert_eq!(bob.skipped_key_order, order_before);
     }
 }

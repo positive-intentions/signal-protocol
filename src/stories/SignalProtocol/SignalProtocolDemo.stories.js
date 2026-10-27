@@ -127,6 +127,7 @@ const SignalProtocolDemo = () => {
         bob.identityKeyPair.privateKey,
         bob.signedPrekeyPair.privateKey,
         bobOneTimePrekeyPrivate,
+        bob.identityKeyPair.publicKey,
         alice.identityKeyPair.publicKey,
         exchangeResult.aliceEphemeralPublic,
       );
@@ -191,6 +192,7 @@ const SignalProtocolDemo = () => {
         bob.identityKeyPair.privateKey,
         bob.signedPrekeyPair.privateKey,
         bobOneTimePrekeyPrivate,
+        bob.identityKeyPair.publicKey,
         alice.identityKeyPair.publicKey,
         exchangeResult.aliceEphemeralPublic,
       );
@@ -1079,13 +1081,20 @@ const DoubleRatchetOnlyDemo = () => {
       crypto.getRandomValues(sharedSecret);
 
       // Initialize Double Ratchet states
-      const aliceState = wasmModule.initialize_double_ratchet(
-        sharedSecret,
-        true,
+      const __spk = wasmModule.generate_signed_prekey();
+      const __ad = new TextEncoder().encode(
+        "IK_A||IK_B_story_ad______________",
       );
-      const bobState = wasmModule.initialize_double_ratchet(
+      const aliceState = wasmModule.initialize_double_ratchet_initiator(
         sharedSecret,
-        false,
+        __ad,
+        __spk.public_key,
+      );
+      const bobState = wasmModule.initialize_double_ratchet_responder(
+        sharedSecret,
+        __ad,
+        __spk.public_key,
+        __spk.private_key,
       );
 
       const conversation = [];

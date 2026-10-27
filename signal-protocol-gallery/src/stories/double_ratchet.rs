@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use signal_protocol_core::{
-    double_ratchet_decrypt_internal, double_ratchet_encrypt_internal,
-    initialize_double_ratchet_internal, DoubleRatchetMessage, DoubleRatchetState,
+    double_ratchet_decrypt_internal, double_ratchet_encrypt_internal, test_ratchet_pair,
+    DoubleRatchetMessage, DoubleRatchetState,
 };
 use whatsup_ui::components::atoms::BodyText;
 use whatsup_ui::gallery::KnobDef;
@@ -112,11 +112,9 @@ fn DoubleRatchetDemo(plaintext: String) -> Element {
                             let mut root = [0u8; 32];
                             root[0] = 0x42;
                             root[31] = 0x24;
-                            match (
-                                initialize_double_ratchet_internal(&root, true),
-                                initialize_double_ratchet_internal(&root, false),
-                            ) {
-                                (Ok(alice), Ok(bob)) => {
+                            let ad = b"IK_A||IK_B_gallery_demo_ad_______";
+                            match test_ratchet_pair(&root, ad) {
+                                Ok((alice, bob, _)) => {
                                     session.set(Session {
                                         alice: Some(alice),
                                         bob: Some(bob),
@@ -124,14 +122,11 @@ fn DoubleRatchetDemo(plaintext: String) -> Element {
                                         last_plaintext: None,
                                     });
                                     teach.write().push(
-                                        "initialize_double_ratchet(shared, initiator=true) → Alice".into(),
-                                    );
-                                    teach.write().push(
-                                        "initialize_double_ratchet(shared, initiator=false) → Bob".into(),
+                                        "test_ratchet_pair(ss, ad) → Alice initiator + Bob responder".into(),
                                     );
                                     status.set(StatusMsg::ok("Session initialized."));
                                 }
-                                (Err(e), _) | (_, Err(e)) => {
+                                Err(e) => {
                                     status.set(StatusMsg::err(e.to_string()));
                                     return;
                                 }

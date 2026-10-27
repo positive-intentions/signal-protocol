@@ -4,18 +4,29 @@
 
 use signal_protocol_core::{
     double_ratchet_decrypt_internal, double_ratchet_encrypt_internal, generate_identity_keypair,
-    initialize_double_ratchet_internal, DoubleRatchetMessage, SignalError,
+    test_ratchet_pair, DoubleRatchetMessage, SignalError,
 };
 
 fn shared_secret() -> [u8; 32] {
     [0x11u8; 32]
 }
 
+fn ad() -> &'static [u8] {
+    b"audit_probe_ad_IK_A||IK_B______"
+}
+
+fn pair() -> (
+    signal_protocol_core::DoubleRatchetState,
+    signal_protocol_core::DoubleRatchetState,
+) {
+    let (alice, bob, _) = test_ratchet_pair(&shared_secret(), ad()).unwrap();
+    (alice, bob)
+}
+
 /// SP-2026-001 — delayed previous-chain message decrypts via PN-archived keys.
 #[test]
 fn sp_2026_001_previous_chain_delayed_message_recovers() {
-    let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-    let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+    let (mut alice, mut bob) = pair();
 
     let m0 = double_ratchet_encrypt_internal(&mut alice, b"a0").unwrap();
     let m1_delayed = double_ratchet_encrypt_internal(&mut alice, b"a1").unwrap();
@@ -51,8 +62,7 @@ fn sp_2026_001_previous_chain_delayed_message_recovers() {
 /// SP-2026-002 — forged ratchet key does not desync the session.
 #[test]
 fn sp_2026_002_forged_ratchet_key_does_not_desync() {
-    let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-    let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+    let (mut alice, mut bob) = pair();
 
     let m0 = double_ratchet_encrypt_internal(&mut alice, b"hello").unwrap();
     assert_eq!(
@@ -82,8 +92,7 @@ fn sp_2026_002_forged_ratchet_key_does_not_desync() {
 /// SP-2026-003 — forged skipped-key header does not burn the real key.
 #[test]
 fn sp_2026_003_forged_skipped_key_preserves_real_message() {
-    let mut alice = initialize_double_ratchet_internal(&shared_secret(), true).unwrap();
-    let mut bob = initialize_double_ratchet_internal(&shared_secret(), false).unwrap();
+    let (mut alice, mut bob) = pair();
 
     let m0 = double_ratchet_encrypt_internal(&mut alice, b"m0").unwrap();
     let _m1 = double_ratchet_encrypt_internal(&mut alice, b"m1").unwrap();
