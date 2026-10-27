@@ -11,20 +11,23 @@ pub mod error;
 pub mod keys;
 pub mod types;
 pub mod x3dh;
+pub mod xeddsa;
 
 pub use crypto::{
     sign_data_internal, simple_ecdh, validate_x25519_public_key, verify_signature_internal,
 };
 pub use double_ratchet::{
     cleanup_skipped_message_keys_internal, derive_message_key, derive_next_chain_key,
-    double_ratchet_decrypt_internal, double_ratchet_encrypt_internal,
-    initialize_double_ratchet_internal, perform_dh_ratchet_step, skip_message_keys,
-    DoubleRatchetMessage, DoubleRatchetState,
+    double_ratchet_decrypt_internal, double_ratchet_encrypt_internal, initialize_double_ratchet,
+    perform_dh_ratchet_step, skip_message_keys, test_ratchet_pair, DoubleRatchetMessage,
+    DoubleRatchetState, RatchetRole,
 };
 pub use error::SignalError;
 pub use keys::{
     generate_ephemeral_keypair, generate_identity_keypair, generate_one_time_prekey,
-    generate_sign_keypair, generate_signed_prekey, sign_prekey, verify_signed_prekey,
+    generate_sign_keypair, generate_signed_prekey, identity_sign_public, sign_prekey,
+    verify_signed_prekey,
 };
 pub use types::{EncryptionResult, KeyPair, X3DHResult};
-pub use x3dh::{x3dh_initiate_internal, x3dh_respond_internal};
+pub use x3dh::{x3dh_associated_data, x3dh_initiate_internal, x3dh_respond_internal};
+pub use xeddsa::{montgomery_to_edwards_public, xeddsa_sign, xeddsa_verify};

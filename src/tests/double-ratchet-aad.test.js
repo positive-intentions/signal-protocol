@@ -17,6 +17,23 @@ global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
 describe("Double Ratchet AAD Functionality", () => {
+  function initRatchetPair(wasmModule, sharedSecret, ad) {
+    const adBytes =
+      ad || new TextEncoder().encode("IK_A||IK_B_test_ad______________");
+    const spk = wasmModule.generate_signed_prekey();
+    const alice = wasmModule.initialize_double_ratchet_initiator(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+    );
+    const bob = wasmModule.initialize_double_ratchet_responder(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+      spk.private_key,
+    );
+    return { alice, bob, spk, ad: adBytes };
+  }
   let wasmModule;
   let wasmProtocol;
   let wasmAvailable = false;
@@ -45,8 +62,10 @@ describe("Double Ratchet AAD Functionality", () => {
       sharedSecret[i] = i + 1;
     }
 
-    const aliceState = wasmModule.initialize_double_ratchet(sharedSecret, true);
-    const bobState = wasmModule.initialize_double_ratchet(sharedSecret, false);
+    const { alice: aliceState, bob: bobState } = initRatchetPair(
+      wasmModule,
+      sharedSecret,
+    );
 
     // Alice encrypts a message
     const plaintext = new TextEncoder().encode("Test message with AAD");
@@ -87,8 +106,10 @@ describe("Double Ratchet AAD Functionality", () => {
       sharedSecret[i] = i + 1;
     }
 
-    const aliceState = wasmModule.initialize_double_ratchet(sharedSecret, true);
-    const bobState = wasmModule.initialize_double_ratchet(sharedSecret, false);
+    const { alice: aliceState, bob: bobState } = initRatchetPair(
+      wasmModule,
+      sharedSecret,
+    );
 
     // Alice -> Bob
     const msg1 = new TextEncoder().encode("Alice to Bob 1");
@@ -126,7 +147,7 @@ describe("Double Ratchet AAD Functionality", () => {
       sharedSecret[i] = i + 1;
     }
 
-    const aliceState = wasmModule.initialize_double_ratchet(sharedSecret, true);
+    const aliceState = initRatchetPair(wasmModule, sharedSecret).alice;
     const plaintext = new TextEncoder().encode("Secret message");
     const encryptedMessage = wasmModule.double_ratchet_encrypt(
       aliceState,

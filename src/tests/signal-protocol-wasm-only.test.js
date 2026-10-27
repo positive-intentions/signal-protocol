@@ -66,7 +66,8 @@ describe("Signal Protocol WASM Implementation (WASM Only)", () => {
 
       // Check for expected WASM functions
       expect(WasmModule.DoubleRatchetState).toBeDefined();
-      expect(WasmModule.initialize_double_ratchet).toBeDefined();
+      expect(WasmModule.initialize_double_ratchet_initiator).toBeDefined();
+      expect(WasmModule.initialize_double_ratchet_responder).toBeDefined();
       expect(WasmModule.double_ratchet_encrypt).toBeDefined();
       expect(WasmModule.double_ratchet_decrypt).toBeDefined();
 

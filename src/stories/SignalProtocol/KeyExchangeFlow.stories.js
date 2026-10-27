@@ -209,6 +209,7 @@ const KeyExchangeFlowDemo = () => {
             bob.identityKeyPair.privateKey,
             bob.signedPrekeyPair.privateKey,
             bobOneTimePrekeyPrivate,
+            bob.identityKeyPair.publicKey,
             alice.identityKeyPair.publicKey,
             exchangeData.keyExchangeResult.aliceEphemeralPublic,
           );
@@ -254,9 +255,8 @@ const KeyExchangeFlowDemo = () => {
             ciphertext: Array.from(encryptedResult.ciphertext)
               .map((b) => b.toString(16).padStart(2, "0"))
               .join(""),
-            messageKey: Array.from(encryptedResult.messageKey)
-              .map((b) => b.toString(16).padStart(2, "0"))
-              .join(""),
+            // SP-2026-016: message keys are not exported; DR uses AEAD envelope
+            messageKey: "",
             messageNumber: encryptedResult.messageNumber,
           });
           break;
@@ -272,23 +272,17 @@ const KeyExchangeFlowDemo = () => {
               .map((byte) => parseInt(byte, 16)),
           );
 
-          // Convert encrypted message hex strings back to Uint8Array
           const ciphertextBytes = new Uint8Array(
             encryptedMessage.ciphertext
               .match(/.{2}/g)
               .map((byte) => parseInt(byte, 16)),
           );
-          const messageKeyBytes = new Uint8Array(
-            encryptedMessage.messageKey
-              .match(/.{2}/g)
-              .map((byte) => parseInt(byte, 16)),
-          );
 
-          // Use WASM decryptMessage method
+          // SP-2026-016: decrypt via Double Ratchet session held in wasm bindings
           const decryptedBytes = await wasmInstance.decryptMessage(
             bobSecretBytes,
             ciphertextBytes,
-            messageKeyBytes,
+            new Uint8Array(0),
             encryptedMessage.messageNumber,
           );
 

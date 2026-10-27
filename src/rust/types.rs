@@ -110,11 +110,6 @@ pub struct EncryptionResult {
     /// Includes the AES-GCM nonce prepended to the ciphertext
     #[wasm_bindgen(skip)]
     pub ciphertext: Vec<u8>,
-
-    /// The derived message key used for this specific message
-    /// Can be stored separately for later decryption
-    #[wasm_bindgen(skip)]
-    pub message_key: Vec<u8>,
 }
 
 #[wasm_bindgen]
@@ -126,14 +121,5 @@ impl EncryptionResult {
     #[wasm_bindgen(getter)]
     pub fn ciphertext(&self) -> Uint8Array {
         Uint8Array::from(&self.ciphertext[..])
-    }
-
-    /// Get the message key as a JavaScript Uint8Array
-    ///
-    /// This key is required for decryption and should be stored
-    /// securely alongside the ciphertext if needed for later access.
-    #[wasm_bindgen(getter)]
-    pub fn message_key(&self) -> Uint8Array {
-        Uint8Array::from(&self.message_key[..])
     }
 }

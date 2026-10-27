@@ -4,7 +4,7 @@
 <img src="signal.png" alt="App Logo" />
 </div>
 
-> **Warning:** This project is open source for transparency and education. An in-house library review ([`security/SP-2026-library-audit.md`](security/SP-2026-library-audit.md)) found High-severity Double Ratchet and X3DH issues. It is **not** an independent firm audit. Do not use this crate for production messaging until those findings are fixed. Use at your own risk.
+> **Warning:** Research-grade, not an independent firm audit. [SP-2026](security/SP-2026-library-audit.md) findings are **mitigated** in-tree (commit-after-AEAD, PN skip, X3DH SPK verify, XEdDSA identity, IK-bound AD). **Hard break:** regenerate identities / re-pair after upgrade. Still not libsignal wire-compatible; use at your own risk.
 
 <div align="center">
   
@@ -203,15 +203,20 @@ const exchangeResult = await SignalWasmHelpers.performX3DHKeyExchange(
   wasmInstance,
 );
 
-// Initialize Double Ratchet
+// Initialize Double Ratchet (SP-2026: role + SPK + non-empty AD)
+// Use Bob's SPK from the X3DH bundle — do not generate a fresh SPK here.
 const wasmModule = await loadWasmModule();
-const aliceState = wasmModule.initialize_double_ratchet(
+const ad = exchangeResult.associatedData; // IK_A || IK_B from X3DH
+const aliceState = wasmModule.initialize_double_ratchet_initiator(
   exchangeResult.sharedSecret,
-  true, // isInitiator
+  ad,
+  bobBundle.signedPrekey,
 );
-const bobState = wasmModule.initialize_double_ratchet(
+const bobState = wasmModule.initialize_double_ratchet_responder(
   exchangeResult.sharedSecret,
-  false, // isInitiator
+  ad,
+  bob.signedPrekeyPair.publicKey,
+  bob.signedPrekeyPair.privateKey,
 );
 
 // Encrypt and decrypt messages

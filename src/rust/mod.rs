@@ -42,14 +42,14 @@ pub mod wasm_tests;
 pub use crypto::{sign_data, verify_signature};
 pub use double_ratchet::{
     cleanup_skipped_message_keys, double_ratchet_decrypt, double_ratchet_encrypt,
-    initialize_double_ratchet, DoubleRatchetMessage, DoubleRatchetState,
+    initialize_double_ratchet_initiator, initialize_double_ratchet_responder, DoubleRatchetMessage,
+    DoubleRatchetState,
 };
 pub use error::SignalError;
 pub use keys::{
     generate_ephemeral_keypair, generate_identity_keypair, generate_one_time_prekey,
-    generate_signed_prekey,
+    generate_signed_prekey, sign_prekey, verify_signed_prekey,
 };
-pub use messages::{decrypt_message, encrypt_message};
 pub use types::{EncryptionResult, KeyPair, X3DHResult};
 pub use utils::{
     deserialize_public_key, free_buffer, free_keypair, hkdf_derive_key, serialize_public_key,

@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use signal_protocol_core::{
-    double_ratchet_decrypt_internal, double_ratchet_encrypt_internal,
-    initialize_double_ratchet_internal, DoubleRatchetMessage, DoubleRatchetState,
+    double_ratchet_decrypt_internal, double_ratchet_encrypt_internal, test_ratchet_pair,
+    DoubleRatchetMessage, DoubleRatchetState,
 };
 use whatsup_ui::components::atoms::BodyText;
 
@@ -98,11 +98,9 @@ fn SkippedDemo() -> Element {
                             let mut root = [0u8; 32];
                             root[0] = 0x11;
                             root[31] = 0x22;
-                            match (
-                                initialize_double_ratchet_internal(&root, true),
-                                initialize_double_ratchet_internal(&root, false),
-                            ) {
-                                (Ok(alice), Ok(bob)) => {
+                            let ad = b"IK_A||IK_B_gallery_skip_ad_______";
+                            match test_ratchet_pair(&root, ad) {
+                                Ok((alice, bob, _)) => {
                                     session.set(SkipSession {
                                         alice: Some(alice),
                                         bob: Some(bob),
@@ -112,7 +110,7 @@ fn SkippedDemo() -> Element {
                                     teach.write().push("DR init for Alice + Bob".into());
                                     status.set(StatusMsg::ok("Initialized."));
                                 }
-                                (Err(e), _) | (_, Err(e)) => {
+                                Err(e) => {
                                     status.set(StatusMsg::err(e.to_string()));
                                     return;
                                 }

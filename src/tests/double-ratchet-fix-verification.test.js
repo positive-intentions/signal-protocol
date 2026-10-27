@@ -10,6 +10,23 @@ global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
 describe("Double Ratchet Fix Verification", () => {
+  function initRatchetPair(wasmModule, sharedSecret, ad) {
+    const adBytes =
+      ad || new TextEncoder().encode("IK_A||IK_B_test_ad______________");
+    const spk = wasmModule.generate_signed_prekey();
+    const alice = wasmModule.initialize_double_ratchet_initiator(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+    );
+    const bob = wasmModule.initialize_double_ratchet_responder(
+      sharedSecret,
+      adBytes,
+      spk.public_key,
+      spk.private_key,
+    );
+    return { alice, bob, spk, ad: adBytes };
+  }
   let wasmModule;
   let wasmAvailable = false;
 
@@ -35,7 +52,7 @@ describe("Double Ratchet Fix Verification", () => {
   async function initializeSignalUser(name) {
     const identityKeyPair = wasmModule.generate_identity_keypair();
     const signedPrekeyPair = wasmModule.generate_signed_prekey();
-    const signedPrekeySignature = wasmModule.sign_data(
+    const signedPrekeySignature = wasmModule.sign_prekey(
       identityKeyPair.private_key,
       signedPrekeyPair.public_key,
     );
@@ -74,12 +91,14 @@ describe("Double Ratchet Fix Verification", () => {
     // Generate ephemeral key pair for Alice
     const aliceEphemeral = wasmModule.generate_ephemeral_keypair();
 
-    // Initiate X3DH
+    // Initiate X3DH (alice_ik_priv, alice_eph_priv, alice_ik_pub, bob_ik_pub, bob_spk_pub, bob_spk_sig, otpk?)
     const result = wasmModule.x3dh_initiate(
       alice.identityKeyPair.private_key,
       aliceEphemeral.private_key,
+      alice.identityKeyPair.public_key,
       bobBundle.identityKey,
       bobBundle.signedPrekey,
+      bobBundle.signedPrekeySignature,
       bobBundle.oneTimePrekey,
     );
 
@@ -113,13 +132,9 @@ describe("Double Ratchet Fix Verification", () => {
 
     // Step 2: Initialize Double Ratchet states using WASM directly
     console.log("📋 Step 2: Initializing Double Ratchet states");
-    const aliceState = wasmModule.initialize_double_ratchet(
+    const { alice: aliceState, bob: bobState } = initRatchetPair(
+      wasmModule,
       exchangeResult.sharedSecret,
-      true,
-    );
-    const bobState = wasmModule.initialize_double_ratchet(
-      exchangeResult.sharedSecret,
-      false,
     );
 
     console.log("✅ Alice initialized (initiator):", {
@@ -230,13 +245,9 @@ describe("Double Ratchet Fix Verification", () => {
     const bobBundle = getPublicKeyBundle(bob);
     const exchangeResult = performX3DHKeyExchange(alice, bobBundle);
 
-    const aliceState = wasmModule.initialize_double_ratchet(
+    const { alice: aliceState, bob: bobState } = initRatchetPair(
+      wasmModule,
       exchangeResult.sharedSecret,
-      true,
-    );
-    const bobState = wasmModule.initialize_double_ratchet(
-      exchangeResult.sharedSecret,
-      false,
     );
 
     console.log("📊 Initial state analysis:");

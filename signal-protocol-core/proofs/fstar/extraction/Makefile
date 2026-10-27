@@ -145,14 +145,20 @@ $(CACHE_DIR)/Signal_protocol_core.Double_ratchet.fst.checked: | .depend $(HINT_D
 	  $(OTHERFLAGS) Signal_protocol_core.Double_ratchet.fst $(ENABLE_HINTS) --hint_file $(HINT_DIR)/Signal_protocol_core.Double_ratchet.fst.hints
 
 # Full verification (includes Double_ratchet; may hang on limited resources)
-verify: $(addsuffix .checked, $(addprefix $(CACHE_DIR)/,$(ROOTS)))
+verify: patch-fstar-strings $(addsuffix .checked, $(addprefix $(CACHE_DIR)/,$(ROOTS)))
 
 # Lite verification: Crypto, Keys, Error, Types, X3dh only (skips Double_ratchet)
-verify-lite: $(addsuffix .checked, $(addprefix $(CACHE_DIR)/,$(ROOTS_LITE)))
+verify-lite: patch-fstar-strings $(addsuffix .checked, $(addprefix $(CACHE_DIR)/,$(ROOTS_LITE)))
+
+# hax ToString/Into TC noise: use Alloc.String.String constructor directly
+patch-fstar-strings:
+	@python3 -c 'import pathlib,re; rx=re.compile(r"Alloc\.String\.f_to_string #string\s+#FStar\.Tactics\.Typeclasses\.solve\s+", re.M); rx2=re.compile(r"Core_models\.Convert\.f_into #string\s+#Alloc\.String\.t_String\s+#FStar\.Tactics\.Typeclasses\.solve\s+", re.M); \
+[p.write_text(rx2.sub("Alloc.String.String ", rx.sub("Alloc.String.String ", p.read_text()))) for p in pathlib.Path(".").glob("Signal_protocol_core*.fst")]'
 
 # Extract only (no verification)
 extract:
 	$(HAX_CLI)
+	@$(MAKE) patch-fstar-strings
 
 # Interactive mode targets
 %.fst-in:

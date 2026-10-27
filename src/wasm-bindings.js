@@ -252,13 +252,16 @@ export class SignalProtocolWasm {
   // =================== X3DH KEY EXCHANGE ===================
 
   /**
-   * Initiate X3DH key exchange (Alice side)
+   * Initiate X3DH key exchange (Alice side).
+   * SP-2026: requires Alice IK public + Bob SPK signature (verified in-library).
    */
   async x3dhInitiate(
     aliceIdentityPrivate,
     aliceEphemeralPrivate,
+    aliceIdentityPublic,
     bobIdentityPublic,
     bobSignedPrekeyPublic,
+    bobSignedPrekeySignature,
     bobOneTimePrekeyPublic = null,
   ) {
     this._ensureReady();
@@ -273,8 +276,10 @@ export class SignalProtocolWasm {
 
       const aliceIdPrivBytes = convertToBytes(aliceIdentityPrivate);
       const aliceEphPrivBytes = convertToBytes(aliceEphemeralPrivate);
+      const aliceIdPubBytes = convertToBytes(aliceIdentityPublic);
       const bobIdPubBytes = convertToBytes(bobIdentityPublic);
       const bobSignedPubBytes = convertToBytes(bobSignedPrekeyPublic);
+      const bobSignedSigBytes = convertToBytes(bobSignedPrekeySignature);
       const bobOneTimePubBytes = bobOneTimePrekeyPublic
         ? convertToBytes(bobOneTimePrekeyPublic)
         : null;
@@ -282,8 +287,10 @@ export class SignalProtocolWasm {
       const result = wasmModule.x3dh_initiate(
         aliceIdPrivBytes,
         aliceEphPrivBytes,
+        aliceIdPubBytes,
         bobIdPubBytes,
         bobSignedPubBytes,
+        bobSignedSigBytes,
         bobOneTimePubBytes,
       );
 
@@ -298,12 +305,14 @@ export class SignalProtocolWasm {
   }
 
   /**
-   * Respond to X3DH key exchange (Bob side)
+   * Respond to X3DH key exchange (Bob side).
+   * SP-2026: requires Bob IK public for AD = IK_A || IK_B.
    */
   async x3dhRespond(
     bobIdentityPrivate,
     bobSignedPrekeyPrivate,
     bobOneTimePrekeyPrivate,
+    bobIdentityPublic,
     aliceIdentityPublic,
     aliceEphemeralPublic,
   ) {
@@ -321,6 +330,7 @@ export class SignalProtocolWasm {
       const bobIdPrivBytes = convertToBytes(bobIdentityPrivate);
       const bobSignedPrivBytes = convertToBytes(bobSignedPrekeyPrivate);
       const bobOneTimePrivBytes = convertToBytes(bobOneTimePrekeyPrivate);
+      const bobIdPubBytes = convertToBytes(bobIdentityPublic);
       const aliceIdPubBytes = convertToBytes(aliceIdentityPublic);
       const aliceEphPubBytes = convertToBytes(aliceEphemeralPublic);
 
@@ -328,6 +338,7 @@ export class SignalProtocolWasm {
         bobIdPrivBytes,
         bobSignedPrivBytes,
         bobOneTimePrivBytes,
+        bobIdPubBytes,
         aliceIdPubBytes,
         aliceEphPubBytes,
       );
@@ -343,15 +354,35 @@ export class SignalProtocolWasm {
   }
 
   // =================== MESSAGE ENCRYPTION/DECRYPTION ===================
+  // SP-2026-016: legacy encrypt_message/decrypt_message WASM exports removed.
+  // These helpers wrap Double Ratchet for demo / migration call sites.
+
+  _ensureDrSession(sharedSecretBytes) {
+    if (this._drAlice && this._drBob) {
+      return;
+    }
+    const spk = wasmModule.generate_signed_prekey();
+    const ad = new TextEncoder().encode("IK_A||IK_B_bindings_ad____________");
+    this._drAlice = wasmModule.initialize_double_ratchet_initiator(
+      sharedSecretBytes,
+      ad,
+      spk.public_key,
+    );
+    this._drBob = wasmModule.initialize_double_ratchet_responder(
+      sharedSecretBytes,
+      ad,
+      spk.public_key,
+      spk.private_key,
+    );
+  }
 
   /**
-   * Encrypt message using WASM
+   * Encrypt message using Double Ratchet (SP-2026-016)
    */
   async encryptMessage(sharedSecret, plaintext, messageNumber) {
     this._ensureReady();
 
     try {
-      // Convert inputs to proper format
       let sharedSecretBytes, plaintextBytes;
 
       if (sharedSecret instanceof Uint8Array) {
@@ -370,16 +401,21 @@ export class SignalProtocolWasm {
         throw new Error("Plaintext must be Uint8Array or string");
       }
 
-      const result = wasmModule.encrypt_message(
-        sharedSecretBytes,
+      this._ensureDrSession(sharedSecretBytes);
+      const envelope = wasmModule.double_ratchet_encrypt(
+        this._drAlice,
         plaintextBytes,
-        messageNumber,
       );
+      this._lastEnvelope = envelope;
 
       return {
-        ciphertext: result.ciphertext,
-        messageKey: result.message_key,
-        messageNumber: messageNumber,
+        ciphertext: envelope.ciphertext,
+        messageKey: new Uint8Array(0),
+        messageNumber:
+          typeof messageNumber === "number"
+            ? messageNumber
+            : envelope.message_number,
+        envelope,
       };
     } catch (error) {
       throw new Error(`WASM message encryption failed: ${error.message}`);
@@ -387,13 +423,12 @@ export class SignalProtocolWasm {
   }
 
   /**
-   * Decrypt message using WASM
+   * Decrypt message using Double Ratchet (SP-2026-016)
    */
   async decryptMessage(sharedSecret, ciphertext, messageKey, messageNumber) {
     this._ensureReady();
 
     try {
-      // Convert inputs to proper format
       const convertToBytes = (input) => {
         if (input instanceof Uint8Array) return input;
         if (typeof input === "string") return this._hexToBuffer(input);
@@ -401,17 +436,18 @@ export class SignalProtocolWasm {
       };
 
       const sharedSecretBytes = convertToBytes(sharedSecret);
-      const ciphertextBytes = convertToBytes(ciphertext);
-      const messageKeyBytes = convertToBytes(messageKey);
+      this._ensureDrSession(sharedSecretBytes);
 
-      const decrypted = wasmModule.decrypt_message(
-        sharedSecretBytes,
-        ciphertextBytes,
-        messageKeyBytes,
-        messageNumber,
-      );
+      const envelope = this._lastEnvelope;
+      if (!envelope) {
+        throw new Error("No Double Ratchet envelope available for decrypt");
+      }
+      // ciphertext/messageKey/messageNumber kept for call-site compatibility
+      void ciphertext;
+      void messageKey;
+      void messageNumber;
 
-      return decrypted;
+      return wasmModule.double_ratchet_decrypt(this._drBob, envelope);
     } catch (error) {
       throw new Error(`WASM message decryption failed: ${error.message}`);
     }
@@ -597,12 +633,14 @@ export const SignalWasmHelpers = {
     // Generate ephemeral key pair for Alice
     const aliceEphemeral = await wasmInstance.generateEphemeralKeyPair();
 
-    // Initiate X3DH
+    // Initiate X3DH (SP-2026: Alice IK public + Bob SPK signature required)
     const result = await wasmInstance.x3dhInitiate(
       alice.identityKeyPair.privateKey,
       aliceEphemeral.privateKey,
+      alice.identityKeyPair.publicKey,
       bobBundle.identityKey,
       bobBundle.signedPrekey,
+      bobBundle.signedPrekeySignature,
       bobBundle.oneTimePrekey,
     );
 

@@ -38,6 +38,8 @@ import {
   loadWasmModule,
 } from "../../wasm-bindings.js";
 import { CryptoDemo, CodeDisplay, OperationStatus } from "ui";
+let __drSpk = null;
+let __drAd = null;
 
 // Define the component first
 const DoubleRatchetDemo = () => {
@@ -66,9 +68,24 @@ const DoubleRatchetDemo = () => {
           wasmProtocol,
           wasmModule,
           initializeDoubleRatchet: (sharedSecret, isInitiator) => {
-            return wasmModule.initialize_double_ratchet(
+            if (!__drSpk) {
+              __drSpk = wasmModule.generate_signed_prekey();
+              __drAd = new TextEncoder().encode(
+                "IK_A||IK_B_story_ad______________",
+              );
+            }
+            if (isInitiator) {
+              return wasmModule.initialize_double_ratchet_initiator(
+                sharedSecret,
+                __drAd,
+                __drSpk.public_key,
+              );
+            }
+            return wasmModule.initialize_double_ratchet_responder(
               sharedSecret,
-              isInitiator,
+              __drAd,
+              __drSpk.public_key,
+              __drSpk.private_key,
             );
           },
           doubleRatchetEncrypt: (state, message) => {
@@ -840,9 +857,24 @@ const InteractiveMessagingDemo = () => {
           wasmProtocol,
           wasmModule,
           initializeDoubleRatchet: (sharedSecret, isInitiator) => {
-            return wasmModule.initialize_double_ratchet(
+            if (!__drSpk) {
+              __drSpk = wasmModule.generate_signed_prekey();
+              __drAd = new TextEncoder().encode(
+                "IK_A||IK_B_story_ad______________",
+              );
+            }
+            if (isInitiator) {
+              return wasmModule.initialize_double_ratchet_initiator(
+                sharedSecret,
+                __drAd,
+                __drSpk.public_key,
+              );
+            }
+            return wasmModule.initialize_double_ratchet_responder(
               sharedSecret,
-              isInitiator,
+              __drAd,
+              __drSpk.public_key,
+              __drSpk.private_key,
             );
           },
           doubleRatchetEncrypt: (state, message) => {

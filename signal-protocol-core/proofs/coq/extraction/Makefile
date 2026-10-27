@@ -47,6 +47,7 @@ VERIFY_ORDER = Core_Extra.v \
                Signal_protocol_core_Error.v \
                Signal_protocol_core_Types.v \
                Signal_protocol_core_Crypto.v \
+               Signal_protocol_core_Xeddsa.v \
                Signal_protocol_core_Keys.v \
                Signal_protocol_core_X3dh.v \
                Signal_protocol_core_Double_ratchet.v \
@@ -150,13 +151,54 @@ patch-extraction: $(EXTRACTED_V)
 	@if ! grep -q 'Require Import Signal_protocol_core_Error' Signal_protocol_core_Crypto.v 2>/dev/null; then \
 		sed -i '/^From Signal_protocol_core Require Import Core_Extra\./a From Signal_protocol_core Require Import Signal_protocol_core_Error.' Signal_protocol_core_Crypto.v; \
 	fi
-	@# Keys needs Types (for t_KeyPair, KeyPair)
+	@# Xeddsa needs Error (for t_SignalError)
+	@if [ -f Signal_protocol_core_Xeddsa.v ] && ! grep -q 'Require Import Signal_protocol_core_Error' Signal_protocol_core_Xeddsa.v 2>/dev/null; then \
+		sed -i '/^From Signal_protocol_core Require Import Core_Extra\./a From Signal_protocol_core Require Import Signal_protocol_core_Error.' Signal_protocol_core_Xeddsa.v; \
+	fi
+	@# Stub Xeddsa bodies that reference Core helpers not available in Core_Extra
+	@# (Use fixed axiom lines: nested `(32 : t_usize)` breaks the Double_ratchet perl rewriter.)
+	@if [ -f Signal_protocol_core_Xeddsa.v ] && ! grep -q 'Axiom xeddsa_sign' Signal_protocol_core_Xeddsa.v 2>/dev/null; then \
+		awk 'BEGIN{p=1} /^Definition montgomery_to_edwards_public|^Definition xeddsa_sign|^Definition xeddsa_verify/{p=0} p' Signal_protocol_core_Xeddsa.v > Signal_protocol_core_Xeddsa.v.tmp; \
+		printf '%s\n' \
+			"Axiom montgomery_to_edwards_public : t_Slice t_u8 -> t_Result (t_Array t_u8 ((32 : t_usize))) t_SignalError." \
+			"Axiom xeddsa_sign : t_Slice t_u8 -> t_Slice t_u8 -> t_Result (t_Vec t_u8 t_Global) t_SignalError." \
+			"Axiom xeddsa_verify : t_Slice t_u8 -> t_Slice t_u8 -> t_Slice t_u8 -> t_Result bool t_SignalError." \
+			>> Signal_protocol_core_Xeddsa.v.tmp; \
+		mv Signal_protocol_core_Xeddsa.v.tmp Signal_protocol_core_Xeddsa.v; \
+	fi
+	@# Keys needs Error, Types, Xeddsa (sign_prekey / verify_signed_prekey)
 	@if ! grep -q 'Require Import Signal_protocol_core_Types' Signal_protocol_core_Keys.v 2>/dev/null; then \
-		sed -i '/^From Signal_protocol_core Require Import Core_Extra\./a From Signal_protocol_core Require Import Signal_protocol_core_Types.' Signal_protocol_core_Keys.v; \
+		sed -i '/^From Signal_protocol_core Require Import Core_Extra\./a From Signal_protocol_core Require Import Signal_protocol_core_Error.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Types.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Xeddsa.' Signal_protocol_core_Keys.v; \
+	fi
+	@if ! grep -q 'Require Import Signal_protocol_core_Error' Signal_protocol_core_Keys.v 2>/dev/null; then \
+		sed -i '/^From Signal_protocol_core Require Import Core_Extra\./a From Signal_protocol_core Require Import Signal_protocol_core_Error.' Signal_protocol_core_Keys.v; \
+	fi
+	@if ! grep -q 'Require Import Signal_protocol_core_Xeddsa' Signal_protocol_core_Keys.v 2>/dev/null; then \
+		sed -i '/^From Signal_protocol_core Require Import Signal_protocol_core_Types\./a From Signal_protocol_core Require Import Signal_protocol_core_Xeddsa.' Signal_protocol_core_Keys.v; \
+	fi
+	@# Stub Keys bodies that need Into/unsize helpers missing from Core_Extra
+	@if [ -f Signal_protocol_core_Keys.v ] && ! grep -q 'Axiom sign_prekey' Signal_protocol_core_Keys.v 2>/dev/null; then \
+		awk 'BEGIN{p=1} /^Definition sign_prekey|^Definition verify_signed_prekey|^Definition identity_sign_public/{p=0} p' Signal_protocol_core_Keys.v > Signal_protocol_core_Keys.v.tmp; \
+		printf '%s\n' \
+			"Axiom sign_prekey : t_Slice t_u8 -> t_Slice t_u8 -> t_Result (t_Vec t_u8 t_Global) t_SignalError." \
+			"Axiom verify_signed_prekey : t_Slice t_u8 -> t_Slice t_u8 -> t_Slice t_u8 -> t_ControlFlow (t_Result unit t_SignalError) (t_Result (t_Result unit t_SignalError) t_SignalError)." \
+			"Axiom identity_sign_public : t_Slice t_u8 -> t_Result (t_Vec t_u8 t_Global) t_SignalError." \
+			>> Signal_protocol_core_Keys.v.tmp; \
+		mv Signal_protocol_core_Keys.v.tmp Signal_protocol_core_Keys.v; \
 	fi
 	@# X3dh needs Error, Types, Crypto
 	@if ! grep -q 'Require Import Signal_protocol_core_Error' Signal_protocol_core_X3dh.v 2>/dev/null; then \
 		sed -i '/^From Signal_protocol_core Require Import Core_Extra\./a From Signal_protocol_core Require Import Signal_protocol_core_Error.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Types.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Crypto.' Signal_protocol_core_X3dh.v; \
+	fi
+	@# Stub X3dh bodies that need Vec capacity helpers missing from Core_Extra
+	@if [ -f Signal_protocol_core_X3dh.v ] && ! grep -q 'Axiom x3dh_initiate_internal' Signal_protocol_core_X3dh.v 2>/dev/null; then \
+		awk 'BEGIN{p=1} /^Definition x3dh_associated_data|^Definition x3dh_initiate_internal|^Definition x3dh_respond_internal/{p=0} p' Signal_protocol_core_X3dh.v > Signal_protocol_core_X3dh.v.tmp; \
+		printf '%s\n' \
+			"Axiom x3dh_associated_data : t_Slice t_u8 -> t_Slice t_u8 -> t_Vec t_u8 t_Global." \
+			"Axiom x3dh_initiate_internal : t_Slice t_u8 -> t_Slice t_u8 -> t_Slice t_u8 -> t_Slice t_u8 -> t_Slice t_u8 -> t_Slice t_u8 -> t_Option (t_Slice t_u8) -> t_Result t_X3DHResult t_SignalError." \
+			"Axiom x3dh_respond_internal : t_Slice t_u8 -> t_Slice t_u8 -> t_Option (t_Slice t_u8) -> t_Slice t_u8 -> t_Slice t_u8 -> t_Slice t_u8 -> t_Result t_X3DHResult t_SignalError." \
+			>> Signal_protocol_core_X3dh.v.tmp; \
+		mv Signal_protocol_core_X3dh.v.tmp Signal_protocol_core_X3dh.v; \
 	fi
 	@# Double_ratchet needs Error, Types, Crypto, Keys
 	@if ! grep -q 'Require Import Signal_protocol_core_Error' Signal_protocol_core_Double_ratchet.v 2>/dev/null; then \
@@ -165,11 +207,14 @@ patch-extraction: $(EXTRACTED_V)
 	@# Stub out Double_ratchet function bodies that use complex ControlFlow patterns
 	@# (The monadic bind patterns don't map to plain Coq let bindings)
 	@if [ -f Signal_protocol_core_Double_ratchet.v ] && ! grep -q 'Axiom perform_dh_ratchet_step' Signal_protocol_core_Double_ratchet.v 2>/dev/null; then \
-		perl -i -pe 'if (/^Definition (perform_dh_ratchet_step|skip_message_keys|double_ratchet_encrypt_internal|double_ratchet_decrypt_internal|cleanup_skipped_message_keys_internal|aead_encrypt|aead_decrypt|initialize_double_ratchet_internal) /) { s/^Definition (\w+) (.*) : (.*?) :=.*/Axiom $$1 : forall $$2, $$3./; $$skip=1 } elsif ($$skip && /^\s*$$/) { } elsif ($$skip && /^(Definition|End|Axiom|Record)/) { $$skip=0 } elsif ($$skip) { $$_="" }' Signal_protocol_core_Double_ratchet.v; \
+		perl -i -pe 'if (/^Definition (hkdf_derive_short|skipped_key_id|impl_DoubleRatchetState__new|build_message_aad|insert_skipped_key|remove_skipped_key|derive_message_key|derive_next_chain_key|perform_dh_ratchet_step|skip_message_keys|test_ratchet_pair|double_ratchet_encrypt_internal|double_ratchet_decrypt_internal|cleanup_skipped_message_keys_internal|aead_encrypt|aead_decrypt|initialize_double_ratchet|decrypt_with_key|try_skipped_message_key|decrypt_on_state) /) { s/^Definition (\w+) (.*) : (.*?) :=.*/Axiom $$1 : forall $$2, $$3./; $$skip=1 } elsif ($$skip && /^\s*$$/) { } elsif ($$skip && /^(Definition|End|Axiom|Record|Inductive)/) { $$skip=0 } elsif ($$skip) { $$_="" }' Signal_protocol_core_Double_ratchet.v; \
 	fi
 	@# Main Signal_protocol_core.v needs all modules
 	@if ! grep -q 'Require Import Signal_protocol_core_Error' Signal_protocol_core.v 2>/dev/null; then \
-		sed -i '/^From Signal_protocol_core Require Import Core_Extra\./a From Signal_protocol_core Require Import Signal_protocol_core_Error.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Types.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Crypto.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Keys.\nFrom Signal_protocol_core Require Import Signal_protocol_core_X3dh.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Double_ratchet.' Signal_protocol_core.v; \
+		sed -i '/^From Signal_protocol_core Require Import Core_Extra\./a From Signal_protocol_core Require Import Signal_protocol_core_Error.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Types.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Crypto.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Xeddsa.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Keys.\nFrom Signal_protocol_core Require Import Signal_protocol_core_X3dh.\nFrom Signal_protocol_core Require Import Signal_protocol_core_Double_ratchet.' Signal_protocol_core.v; \
+	fi
+	@if ! grep -q 'Require Import Signal_protocol_core_Xeddsa' Signal_protocol_core.v 2>/dev/null; then \
+		sed -i '/Require Import Signal_protocol_core_Crypto\./a From Signal_protocol_core Require Import Signal_protocol_core_Xeddsa.' Signal_protocol_core.v; \
 	fi
 
 # Verify all Rocq files in dependency order
@@ -187,7 +232,7 @@ verify-lite: patch-extraction
 	$(info Verifying core Rocq modules only...)
 	@echo "Compiling AbstractCrypto.v..."
 	@timeout $(TIMEOUT) $(ROCQ) AbstractCrypto.v || exit 1
-	@for f in Core_Extra.v Signal_protocol_core_Error.v Signal_protocol_core_Types.v Signal_protocol_core_Crypto.v Signal_protocol_core_Keys.v Signal_protocol_core_X3dh.v; do \
+	@for f in Core_Extra.v Signal_protocol_core_Error.v Signal_protocol_core_Types.v Signal_protocol_core_Crypto.v Signal_protocol_core_Xeddsa.v Signal_protocol_core_Keys.v Signal_protocol_core_X3dh.v; do \
 		echo "Compiling $$f..."; \
 		timeout $(TIMEOUT) $(ROCQ) $$f || exit 1; \
 	done

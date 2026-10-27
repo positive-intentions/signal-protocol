@@ -55,7 +55,8 @@ pub fn generate_ephemeral_keypair() -> KeyPair {
     generate_x25519_keypair_internal()
 }
 
-/// Ed25519 signing identity used to bind Signal signed prekeys.
+/// Legacy separate Ed25519 signing keypair (deprecated for Signal SPK path).
+/// Prefer XEdDSA on the identity key via [`sign_prekey`] / [`verify_signed_prekey`].
 #[cfg(feature = "crypto-backend")]
 pub fn generate_sign_keypair() -> KeyPair {
     use ed25519_dalek::SigningKey;
@@ -74,21 +75,31 @@ pub fn generate_sign_keypair() -> KeyPair {
     }
 }
 
-/// Sign the 32-byte Signal signed-prekey public key.
+/// Sign the 32-byte signed-prekey public key with the **identity** X25519 private key (XEdDSA).
 pub fn sign_prekey(
-    sign_private: &[u8],
+    identity_private: &[u8],
     signed_prekey_public: &[u8],
 ) -> Result<Vec<u8>, crate::SignalError> {
-    crate::sign_data_internal(sign_private, signed_prekey_public)
+    if signed_prekey_public.len() != 32 {
+        return Err(crate::SignalError::InvalidInput(
+            "Signed prekey public key must be 32 bytes".to_string(),
+        ));
+    }
+    crate::xeddsa::xeddsa_sign(identity_private, signed_prekey_public)
 }
 
-/// Verify a Signal signed-prekey signature.
+/// Verify a signed-prekey signature with the **identity** X25519 public key (XEdDSA).
 pub fn verify_signed_prekey(
-    sign_public: &[u8],
+    identity_public: &[u8],
     signed_prekey_public: &[u8],
     signature: &[u8],
 ) -> Result<(), crate::SignalError> {
-    let ok = crate::verify_signature_internal(sign_public, signature, signed_prekey_public)?;
+    if signed_prekey_public.len() != 32 {
+        return Err(crate::SignalError::InvalidInput(
+            "Signed prekey public key must be 32 bytes".to_string(),
+        ));
+    }
+    let ok = crate::xeddsa::xeddsa_verify(identity_public, signature, signed_prekey_public)?;
     if ok {
         Ok(())
     } else {
@@ -96,6 +107,11 @@ pub fn verify_signed_prekey(
             "signal signed prekey".into(),
         ))
     }
+}
+
+/// Edwards form of an X25519 identity public key (for wire bundles that publish a sign public).
+pub fn identity_sign_public(identity_public: &[u8]) -> Result<Vec<u8>, crate::SignalError> {
+    Ok(crate::xeddsa::montgomery_to_edwards_public(identity_public)?.to_vec())
 }
 
 #[cfg(all(test, feature = "crypto-backend"))]
@@ -123,5 +139,14 @@ mod tests {
         let b = generate_identity_keypair();
         assert_ne!(a.private_key, b.private_key);
         assert_ne!(a.public_key, b.public_key);
+    }
+
+    #[test]
+    fn sign_prekey_with_identity_xeddsa() {
+        let id = generate_identity_keypair();
+        let spk = generate_signed_prekey();
+        let sig = sign_prekey(&id.private_key, &spk.public_key).unwrap();
+        verify_signed_prekey(&id.public_key, &spk.public_key, &sig).unwrap();
+        assert!(verify_signed_prekey(&id.public_key, &spk.public_key, &[0u8; 64]).is_err());
     }
 }

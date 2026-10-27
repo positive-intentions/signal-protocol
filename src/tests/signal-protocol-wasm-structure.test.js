@@ -59,11 +59,15 @@ describe("WASM Module Structure and Build Validation", () => {
       "generate_one_time_prekey",
       "generate_ephemeral_keypair",
       "sign_data",
+      "sign_prekey",
       "verify_signature",
+      "verify_signed_prekey",
       "x3dh_initiate",
       "x3dh_respond",
-      "encrypt_message",
-      "decrypt_message",
+      "initialize_double_ratchet_initiator",
+      "initialize_double_ratchet_responder",
+      "double_ratchet_encrypt",
+      "double_ratchet_decrypt",
       "hkdf_derive_key",
       "serialize_public_key",
       "deserialize_public_key",
@@ -110,9 +114,9 @@ describe("WASM Module Structure and Build Validation", () => {
     const jsFile = path.join(process.cwd(), "pkg", "signal_protocol_wasm.js");
     const jsContent = fs.readFileSync(jsFile, "utf8");
 
-    // EncryptionResult should have ciphertext and message_key getters
+    // EncryptionResult should only expose ciphertext (no message_key in SP-2026)
     expect(jsContent).toContain("get ciphertext()");
-    expect(jsContent).toContain("get message_key()");
+    expect(jsContent).not.toContain("get message_key()");
   });
 
   test("should have correct TypeScript definitions", () => {
@@ -131,7 +135,12 @@ describe("WASM Module Structure and Build Validation", () => {
     // Check for function definitions
     expect(dtsContent).toContain("export function generate_identity_keypair");
     expect(dtsContent).toContain("export function x3dh_initiate");
-    expect(dtsContent).toContain("export function encrypt_message");
+    expect(dtsContent).toContain(
+      "export function initialize_double_ratchet_initiator",
+    );
+    expect(dtsContent).toContain(
+      "export function initialize_double_ratchet_responder",
+    );
   });
 
   test("should validate WASM file is not empty and has correct magic bytes", () => {
@@ -211,13 +220,25 @@ describe("WASM Module Structure and Build Validation", () => {
       expect(dtsContent).toContain("generate_identity_keypair(): KeyPair");
       expect(dtsContent).toContain("generate_signed_prekey(): KeyPair");
 
-      // X3DH functions should return X3DHResult
+      // X3DH functions should return X3DHResult; initiate takes Alice IK pub + Bob SPK sig
       expect(dtsContent).toContain("x3dh_initiate(");
       expect(dtsContent).toContain("X3DHResult");
+      expect(dtsContent).toMatch(
+        /x3dh_initiate\(\s*alice_identity_private:[\s\S]*alice_identity_public:[\s\S]*bob_signed_prekey_signature:/,
+      );
 
-      // Encryption should return EncryptionResult
-      expect(dtsContent).toContain("encrypt_message(");
+      // SP-2026-016: legacy encrypt_message/decrypt_message removed
+      expect(dtsContent).not.toContain("export function encrypt_message");
+      expect(dtsContent).not.toContain("export function decrypt_message");
       expect(dtsContent).toContain("EncryptionResult");
+      expect(dtsContent).toContain("readonly ciphertext: Uint8Array");
+      expect(dtsContent).not.toContain("readonly message_key");
+
+      // Secure Double Ratchet init (initiator/responder + AD + SPK)
+      expect(dtsContent).toContain("initialize_double_ratchet_initiator(");
+      expect(dtsContent).toContain("initialize_double_ratchet_responder(");
+      expect(dtsContent).toContain("double_ratchet_encrypt(");
+      expect(dtsContent).toContain("double_ratchet_decrypt(");
     });
 
     test("should have proper Uint8Array parameter types", () => {

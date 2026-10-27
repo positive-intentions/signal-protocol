@@ -34,7 +34,7 @@
     "build:reset": "rm -rf ./Frontend && mkdir ./Frontend",
     "start:gallery": "export PATH=\"$HOME/.cargo/bin:$PATH\" && cd signal-protocol-gallery && dx serve --bin signal-protocol-gallery --platform web",
     "build:gallery": "export PATH=\"$HOME/.cargo/bin:$PATH\" && cd signal-protocol-gallery && dx build --release --bin signal-protocol-gallery --platform web && cp -r target/dx/signal-protocol-gallery/release/web/public/. ../Frontend/ && rm -rf ../Frontend/assets/coverage-html && cp ../serve.json ../Frontend/serve.json",
-    "build:wasm": "export PATH=\"$HOME/.cargo/bin:$PATH\" && wasm-pack build --target web --out-dir ./pkg && cp -r ./pkg ./Frontend/pkg && rm -f ./Frontend/pkg/.gitignore",
+    "build:wasm": "export PATH=\"$HOME/.cargo/bin:$PATH\" && wasm-pack build --target web --out-dir ./pkg && rm -rf ./Frontend/pkg && cp -r ./pkg ./Frontend/pkg && rm -f ./Frontend/pkg/.gitignore",
     "build:wasm:quick": "export PATH=\"$HOME/.cargo/bin:$PATH\" && wasm-pack build --target web --out-dir pkg && echo '✅ WASM built to pkg/'",
     "build:wasm:production": "export PATH=\"$HOME/.cargo/bin:$PATH\" && wasm-pack build --release --target web --out-dir pkg && echo '✅ Production WASM built'",
     "build:wasm:dev": "export PATH=\"$HOME/.cargo/bin:$PATH\" && wasm-pack build --dev --target web --out-dir pkg",

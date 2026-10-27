@@ -109,25 +109,17 @@ mod wasm_tests {
         assert_eq!(associated_bytes, vec![4u8; 16]);
     }
 
-    // Test EncryptionResult WASM getter methods
+    // Test EncryptionResult WASM getter methods (SP-2026-011: no message_key export)
     #[wasm_bindgen_test]
     fn test_encryption_result_wasm_getters() {
         let result = EncryptionResult {
             ciphertext: vec![5u8; 64],
-            message_key: vec![6u8; 32],
         };
 
-        // Test ciphertext getter
         let ciphertext_js = result.ciphertext();
         assert_eq!(ciphertext_js.length(), 64);
         let ciphertext_bytes: Vec<u8> = ciphertext_js.to_vec();
         assert_eq!(ciphertext_bytes, vec![5u8; 64]);
-
-        // Test message_key getter
-        let message_key_js = result.message_key();
-        assert_eq!(message_key_js.length(), 32);
-        let message_key_bytes: Vec<u8> = message_key_js.to_vec();
-        assert_eq!(message_key_bytes, vec![6u8; 32]);
     }
 
     // Test key generation functions

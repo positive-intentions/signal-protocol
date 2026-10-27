@@ -1,7 +1,8 @@
 use dioxus::prelude::*;
 use signal_protocol_core::{
     generate_ephemeral_keypair, generate_identity_keypair, generate_one_time_prekey,
-    generate_signed_prekey, x3dh_initiate_internal, x3dh_respond_internal, KeyPair, X3DHResult,
+    generate_signed_prekey, sign_prekey, x3dh_initiate_internal, x3dh_respond_internal, KeyPair,
+    X3DHResult,
 };
 use whatsup_ui::gallery::KnobDef;
 
@@ -142,11 +143,23 @@ fn X3dhDemo(use_otpk: bool) -> Element {
                                 return;
                             };
                             let otpk_pub = p.bob_otpk.as_ref().map(|k| k.public_key.as_slice());
+                            let bob_spk_sig = match sign_prekey(
+                                &bob_id.private_key,
+                                &bob_spk.public_key,
+                            ) {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    status.set(StatusMsg::err(format!("sign SPK: {e}")));
+                                    return;
+                                }
+                            };
                             match x3dh_initiate_internal(
                                 &alice_id.private_key,
                                 &alice_eph.private_key,
+                                &alice_id.public_key,
                                 &bob_id.public_key,
                                 &bob_spk.public_key,
+                                &bob_spk_sig,
                                 otpk_pub,
                             ) {
                                 Ok(r) => {
@@ -193,6 +206,7 @@ fn X3dhDemo(use_otpk: bool) -> Element {
                                 &bob_id.private_key,
                                 &bob_spk.private_key,
                                 otpk_priv,
+                                &bob_id.public_key,
                                 &alice_id.public_key,
                                 &alice_eph.public_key,
                             ) {

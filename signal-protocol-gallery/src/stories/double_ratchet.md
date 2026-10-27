@@ -16,7 +16,7 @@ plaintext: hello from Alice
 
 ## Step-by-step
 
-1. **Init session** — `initialize_double_ratchet_internal` for both
+1. **Init session** — `test_ratchet_pair` (initiator + responder + AD)
 2. **Alice encrypt** — first outbound message (`double_ratchet_encrypt_internal`)
 3. **Bob decrypt** — first inbound triggers Bob’s DH ratchet
 4. **Bob encrypt reply** — Bob now has a sending chain
@@ -32,6 +32,6 @@ plaintext: hello from Alice
 
 | Step | Core API |
 |------|----------|
-| 1 | `initialize_double_ratchet_internal` |
+| 1 | `test_ratchet_pair` |
 | 2, 4 | `double_ratchet_encrypt_internal` |
 | 3, 5 | `double_ratchet_decrypt_internal` |

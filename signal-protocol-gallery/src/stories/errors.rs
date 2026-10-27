@@ -1,8 +1,8 @@
 use dioxus::prelude::*;
 use signal_protocol_core::{
     double_ratchet_decrypt_internal, double_ratchet_encrypt_internal, generate_identity_keypair,
-    initialize_double_ratchet_internal, sign_data_internal, validate_x25519_public_key,
-    verify_signature_internal, x3dh_initiate_internal,
+    initialize_double_ratchet, sign_data_internal, test_ratchet_pair, validate_x25519_public_key,
+    verify_signature_internal, x3dh_initiate_internal, RatchetRole,
 };
 use whatsup_ui::components::atoms::BodyText;
 
@@ -95,8 +95,10 @@ fn ErrorSurfaceDemo() -> Element {
                             let msg = match x3dh_initiate_internal(
                                 &alice.private_key,
                                 &eph.private_key,
+                                &alice.public_key,
                                 &bob.public_key,
                                 &short,
+                                &[0u8; 64],
                                 None,
                             ) {
                                 Ok(_) => "unexpected Ok".into(),
@@ -109,7 +111,14 @@ fn ErrorSurfaceDemo() -> Element {
                             status.set(StatusMsg::ok(msg));
                         }
                         2 => {
-                            let msg = match initialize_double_ratchet_internal(&[0u8; 16], true) {
+                            let spk = generate_identity_keypair();
+                            let msg = match initialize_double_ratchet(
+                                &[0u8; 16],
+                                b"IK_A||IK_B_gallery_err_ad________",
+                                RatchetRole::Initiator {
+                                    remote_spk_public: &spk.public_key,
+                                },
+                            ) {
                                 Ok(_) => "unexpected Ok".into(),
                                 Err(e) => format!("DR init short secret → {e}"),
                             };
@@ -121,15 +130,9 @@ fn ErrorSurfaceDemo() -> Element {
                         }
                         3 => {
                             let root = [7u8; 32];
-                            let mut alice = match initialize_double_ratchet_internal(&root, true) {
-                                Ok(s) => s,
-                                Err(e) => {
-                                    status.set(StatusMsg::err(format!("setup failed: {e}")));
-                                    return;
-                                }
-                            };
-                            let mut bob = match initialize_double_ratchet_internal(&root, false) {
-                                Ok(s) => s,
+                            let ad = b"IK_A||IK_B_gallery_err_ad________";
+                            let (mut alice, mut bob, _) = match test_ratchet_pair(&root, ad) {
+                                Ok(p) => p,
                                 Err(e) => {
                                     status.set(StatusMsg::err(format!("setup failed: {e}")));
                                     return;
