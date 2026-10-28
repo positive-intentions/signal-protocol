@@ -1,10 +1,6 @@
 name: Verify F*
 
 on:
-  push:
-    branches: [staging]
-  pull_request:
-    branches: [staging]
   workflow_dispatch:
 
 concurrency:

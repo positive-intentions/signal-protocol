@@ -1,9 +1,7 @@
 name: 'Workflow of Parent REPO'
 
 on:
-  push:
-    branches:
-      - staging
+  workflow_dispatch:
 
 jobs: 
   trigger_workflow:
